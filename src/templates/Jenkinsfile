@@ -1,0 +1,36 @@
+@Library('my-shared-library') _
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'staging', 'prod'], description: 'Select Environment')
+    }
+
+    stages {
+        stage('Deploy Microservice') {
+            steps {
+                script {
+                    // Initialize the class from your library
+                    def deployer = new com.helper.Deployer(this)
+                    
+                    echo "Starting deployment for Employee Service..."
+                    deployer.validate(params.ENVIRONMENT)
+                    
+                    // Force failure to test rollback
+                   
+                }
+            }
+        }
+    }
+
+    // THE POST BLOCK MUST BE HERE (Inside pipeline, outside stages)
+    post {
+        failure {
+            script {
+                def deployer = new com.helper.Deployer(this)
+                deployer.rollback(params.ENVIRONMENT, "blue-green")
+            }
+        }
+    }
+}
