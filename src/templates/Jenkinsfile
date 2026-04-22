@@ -18,7 +18,7 @@ pipeline {
                     deployer.validate(params.ENVIRONMENT)
                     
                     // Force failure to test rollback
-                   
+                 error "Simulating a deployment failure!"  
                 }
             }
         }
