@@ -8,28 +8,26 @@ class Notification implements Serializable {
     }
 
     def send(String status) {
-        def recipient = "admin251807@gmail.com"
-        def subject = "${status.toUpperCase()}: Job '${script.env.JOB_NAME}' [Build #${script.env.BUILD_NUMBER}]"
+        // Define message details once to use for both Email and Slack
+        def subject = "${status}: Job '${script.env.JOB_NAME}' [${script.env.BUILD_NUMBER}]"
+        def details = "Check console output at: ${script.env.BUILD_URL}"
+        
+        // Define color for Slack (good = green, danger = red)
+        def slackColor = (status == 'Success') ? 'good' : 'danger'
 
-        // Custom HTML Template for the email body
-        def details = """
-            <h3>Build Status: ${status}</h3>
-            <p><b>Job:</b> ${script.env.JOB_NAME}</p>
-            <p><b>Build Number:</b> ${script.env.BUILD_NUMBER}</p>
-            <p><b>Duration:</b> ${script.currentBuild.durationString}</p>
-            <p><b>Console Logs:</b> <a href="${script.env.BUILD_URL}console">View Logs</a></p>
-            <hr>
-            <p><i>Sent automatically via Jenkins Shared Library</i></p>
-        """
-
-        script.echo "Attempting to send ${status} email to ${recipient}..."
-
-        // Actual Jenkins Email Extension Plugin command
+        // 1. Email Notification (to your Mailtrap Sandbox)
         script.emailext (
-            to: recipient,
+            to: "admin251807@gmail.com",
             subject: subject,
             body: details,
             mimeType: 'text/html'
+        )
+
+        // 2. Slack Notification
+        script.slackSend (
+            channel: '#general', 
+            color: slackColor,
+            message: "${subject}\n${details}"
         )
     }
 }
