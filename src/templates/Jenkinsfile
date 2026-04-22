@@ -5,26 +5,19 @@ pipeline {
     stages {
         stage('Notify Start') {
             steps {
-                script {
-                    // This calls the logic in src/com/helper/Notification.groovy
-                    new com.helper.Notification(this).send("Started")
-                }
+                script { new com.helper.Notification(this).send("Started") }
             }
         }
         stage('Deploy Microservice') {
             steps {
                 echo "--- PHASE: VALIDATION ---"
-                // Your microservice logic here
-                echo "Executing deployment tasks..."
+                // This command will fail because 'exit 1' tells Linux the task failed
+                sh "exit 1" 
             }
         }
     }
     post {
-        success { 
-            script { new com.helper.Notification(this).send("Success") } 
-        }
-        failure { 
-            script { new com.helper.Notification(this).send("Failure") } 
-        }
+        success { script { new com.helper.Notification(this).send("Success") } }
+        failure { script { new com.helper.Notification(this).send("Failure") } }
     }
 }
