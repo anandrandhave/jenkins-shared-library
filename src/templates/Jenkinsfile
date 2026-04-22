@@ -1,16 +1,25 @@
+@Library('my-shared-library') _
+
 pipeline {
     agent any
     stages {
         stage('Notify Start') {
             steps {
-                script { new com.helper.Notification(this).send("Started") }
+                script { 
+                    // This calls the Notification class in src/com/helper/
+                    new com.helper.Notification(this).send("Started") 
+                }
             }
         }
-        stage('Deploy') {
-            steps { echo "Deploying build..." }
+        stage('Deploy Phase') {
+            steps { 
+                echo "Deploying build for Assignment 2..." 
+                // Note: To see a FAILURE notification, change the line below to: sh "exit 1"
+                sh "echo 'Deployment successful'"
+            }
         }
     }
-    // This block triggers ONLY after the stages are finished
+    // These blocks trigger based on the final status of the stages above
     post {
         success {
             script { new com.helper.Notification(this).send("Success") }
