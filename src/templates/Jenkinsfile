@@ -1,5 +1,3 @@
-@Library('my-shared-library') _
-
 pipeline {
     agent any
     stages {
@@ -8,16 +6,17 @@ pipeline {
                 script { new com.helper.Notification(this).send("Started") }
             }
         }
-        stage('Deploy Microservice') {
-            steps {
-                echo "--- PHASE: VALIDATION ---"
-                // This command will fail because 'exit 1' tells Linux the task failed
-                sh "exit 1" 
-            }
+        stage('Deploy') {
+            steps { echo "Deploying build..." }
         }
     }
+    // This block triggers ONLY after the stages are finished
     post {
-        success { script { new com.helper.Notification(this).send("Success") } }
-        failure { script { new com.helper.Notification(this).send("Failure") } }
+        success {
+            script { new com.helper.Notification(this).send("Success") }
+        }
+        failure {
+            script { new com.helper.Notification(this).send("Failure") }
+        }
     }
 }
