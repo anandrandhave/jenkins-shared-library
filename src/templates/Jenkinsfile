@@ -1,35 +1,30 @@
 @Library('my-shared-library') _
-import com.helper.Notification
-import com.helper.Deployer
 
 pipeline {
     agent any
-    
     stages {
-        stage('Deploy Microservice') {
+        stage('Notify Start') {
             steps {
                 script {
-                    def deployer = new com.helper.Deployer(this)
-                    deployer.validate(params.ENVIRONMENT)
-                    // Add your actual deployment commands here
+                    // This calls the logic in src/com/helper/Notification.groovy
+                    new com.helper.Notification(this).send("Started")
                 }
             }
         }
-    }
-
-    post {
-        always {
-            script {
-                def notify = new com.helper.Notification(this)
-
-                if (currentBuild.result == 'SUCCESS') {
-                    notify.send("Success")
-                } else if (currentBuild.result == 'FAILURE') {
-                    notify.send("Failure")
-                } else if (currentBuild.result == 'UNSTABLE') {
-                    notify.send("Unstable")
-                }
+        stage('Deploy Microservice') {
+            steps {
+                echo "--- PHASE: VALIDATION ---"
+                // Your microservice logic here
+                echo "Executing deployment tasks..."
             }
+        }
+    }
+    post {
+        success { 
+            script { new com.helper.Notification(this).send("Success") } 
+        }
+        failure { 
+            script { new com.helper.Notification(this).send("Failure") } 
         }
     }
 }
