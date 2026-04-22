@@ -11,7 +11,7 @@ class Notification implements Serializable {
         // Define message details once to use for both Email and Slack
         def subject = "${status}: Job '${script.env.JOB_NAME}' [${script.env.BUILD_NUMBER}]"
         def details = "Check console output at: ${script.env.BUILD_URL}"
-        
+
         // Define color for Slack (good = green, danger = red)
         def slackColor = (status == 'Success') ? 'good' : 'danger'
 
@@ -23,9 +23,10 @@ class Notification implements Serializable {
             mimeType: 'text/html'
         )
 
-        // 2. Slack Notification
+        // 2. Slack Notification (Using your specific IDs)
         script.slackSend (
-            channel: '#general', 
+            tokenCredentialId: 'slack-webhook', 
+            channel: 'C0B024EQX32', 
             color: slackColor,
             message: "${subject}\n${details}"
         )
