@@ -17,6 +17,13 @@ pipeline {
                 }
             }
         }
+
+        // ADD IT HERE
+        stage('Dev Environment') {
+            steps {
+                echo "Simulating a build failure..."
+                sh "exit 1"
+
         stage('Deploy Phase') {
             steps {
                 // This will print whichever environment you picked in the dropdown
@@ -32,10 +39,3 @@ pipeline {
     }
 }
 
-
-stage('Dev Environment') {
-    steps {
-        echo "Simulating a build failure..."
-        sh "exit 1" 
-    }
-}
