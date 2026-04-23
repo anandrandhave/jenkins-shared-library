@@ -20,10 +20,12 @@ pipeline {
             steps {
                 script {
                     echo "Deploying to ${params.ENVIRONMENT}..."
-                    echo "--- DEBUG: Testing Failure Notification ---"
+                    echo "--- DEBUG: Testing UNSTABLE Notification ---"
                     
-                    // This forces the build to fail immediately
-                    sh "exit 1" 
+                    // This sets the result to Unstable but lets the stage finish
+                    currentBuild.result = 'UNSTABLE'
+                    
+                    echo "The build is now marked as UNSTABLE, but I am still running!"
                 }
             }
         }
