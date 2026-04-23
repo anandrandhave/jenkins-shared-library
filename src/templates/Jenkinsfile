@@ -11,7 +11,6 @@ pipeline {
         stage('Notify Start') {
             steps {
                 script {
-                    // This is sending correctly for you
                     new com.helper.Notification(this).send("Started")
                 }
             }
@@ -19,15 +18,13 @@ pipeline {
 
         stage('Deployment Environment') {
             steps {
-                echo "Deploying to ${params.ENVIRONMENT} environment..."
-                // To test Success: Leave as is.
-                // To test Failure: Uncomment next line -> error "Failure"
-                // To test Unstable: Uncomment next line -> currentBuild.result = 'UNSTABLE'
+                echo "Deploying to ${params.ENVIRONMENT}..."
+                // WAIT HERE: This gives Mailtrap time to reset its rate limit
+                sh "sleep 15" 
             }
         }
     }
 
-    // THE POST BLOCK MUST BE OUTSIDE OF STAGES
     post {
         success { 
             script { new com.helper.Notification(this).send("Success") } 
