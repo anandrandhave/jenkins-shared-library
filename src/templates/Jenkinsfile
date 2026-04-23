@@ -5,27 +5,28 @@ pipeline {
     stages {
         stage('Notify Start') {
             steps {
-                script { 
-                    // This calls the Notification class in src/com/helper/
-                    new com.helper.Notification(this).send("Started") 
-                }
+                script { new com.helper.Notification(this).send("Started") }
             }
         }
-        stage('Deploy Phase') {
-            steps { 
-                echo "Deploying build for Assignment 2..." 
-                // Note: To see a FAILURE notification, change the line below to: sh "exit 1"
-                sh "echo 'Deployment successful'"
-            }
+        stage('Deploy to Dev') {
+            steps { echo "Deploying to Dev..." }
+        }
+        stage('Deploy to Test') {
+            steps { echo "Deploying to Test..." }
+        }
+        stage('Deploy to Prod') {
+            steps { echo "Deploying to Prod..." }
         }
     }
-    // These blocks trigger based on the final status of the stages above
     post {
         success {
             script { new com.helper.Notification(this).send("Success") }
         }
         failure {
             script { new com.helper.Notification(this).send("Failure") }
+        }
+        unstable {
+            script { new com.helper.Notification(this).send("Unstable") }
         }
     }
 }

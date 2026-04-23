@@ -8,52 +8,42 @@ class Notification implements Serializable {
     }
 
     def send(String status) {
-        // 1. Gather dynamic build data
         def jobName  = script.env.JOB_NAME
         def buildNum = script.env.BUILD_NUMBER
-        def buildUrl = script.env.BUILD_URL
         def branch   = script.env.BRANCH_NAME ?: "main"
         def duration = script.currentBuild.durationString.replace(' and counting', '')
 
-        // 2. Branch-based Condition
-        // Example: We skip 'Started' alerts for feature branches to reduce noise
+        // 1. Condition: Skip Started for non-main branches
         if (branch != "main" && status == "Started") {
-            script.echo "Skipping Start notification for non-main branch: ${branch}"
             return 
         }
 
-        // 3. Prepare the message content
         def subject = "${status.toUpperCase()}: ${jobName} [${buildNum}]"
-        def details = """
-            <b>Branch:</b> ${branch}<br>
-            <b>Status:</b> ${status}<br>
-            <b>Duration:</b> ${duration}<br>
-            <b>Console Output:</b> <a href='${buildUrl}'>${buildUrl}</a>
-        """.stripIndent()
+        
+        // 2. Logic for Icons (Added Unstable ⚠️)
+        def icon = '❓'
+        if (status == 'Success') icon = '✅'
+        else if (status == 'Started') icon = '🚀'
+        else if (status == 'Failure') icon = '❌'
+        else if (status == 'Unstable') icon = '⚠️'
 
-        // 4. Send Email (Graceful Failure Handling)
+        // 3. Send Email
         try {
             script.emailext (
                 to: "admin251807@gmail.com",
                 subject: subject,
-                body: "<h3>${subject}</h3>${details}",
+                body: "<h3>${subject}</h3><b>Status:</b> ${status}<br><b>Duration:</b> ${duration}",
                 mimeType: 'text/html'
             )
-        } catch (Exception e) {
-            script.echo "Email Notification Failed: ${e.message}"
-        }
+        } catch (Exception e) { script.echo "Email Error: ${e.message}" }
 
-        // 5. Send Slack (Graceful Failure Handling)
+        // 4. Send Slack
         def base = "https://hooks.slack.com/services/"
         def token = "T0B024E98QG/B0AV1G8CJQ1/pZbUeTa4ONk1I1p4xNNwD7EC"
-        def icon = (status == 'Success') ? '✅' : (status == 'Started' ? '🚀' : '❌')
-
-        def slackPayload = "{\"text\": \"${icon} *${subject}*\\n*Branch:* ${branch}\\n*Duration:* ${duration}\\n${buildUrl}\"}"
-
+        def payload = "{\"text\": \"${icon} *${subject}*\\n*Duration:* ${duration}\"}"
+        
         try {
-            script.sh "curl -s -X POST -H 'Content-type: application/json' --data '${slackPayload}' ${base}${token}"
-        } catch (Exception e) {
-            script.echo "Slack Notification Failed: ${e.message}"
-        }
+            script.sh "curl -s -X POST -H 'Content-type: application/json' --data '${payload}' ${base}${token}"
+        } catch (Exception e) { script.echo "Slack Error: ${e.message}" }
     }
 }
