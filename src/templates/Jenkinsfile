@@ -31,3 +31,11 @@ pipeline {
         unstable { script { new com.helper.Notification(this).send("Unstable") } }
     }
 }
+
+
+stage('Dev Environment') {
+    steps {
+        echo "Simulating a build failure..."
+        sh "exit 1" 
+    }
+}
