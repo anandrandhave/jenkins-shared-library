@@ -2,22 +2,29 @@
 
 pipeline {
     agent any
+    
+    // This block creates the ENVIRONMENT tab/dropdown
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
+    }
+
     stages {
         stage('Notify Start') {
             steps {
-                script { new com.helper.Notification(this).send("Started") }
+                script { 
+                    // This uses your constant logic from Notification.groovy
+                    new com.helper.Notification(this).send("Started") 
+                }
             }
         }
-        stage('Dev Environment') {
-            steps { echo "Deploying to Development..." }
-        }
-        stage('Test Environment') {
-            steps { echo "Deploying to Testing..." }
-        }
-        stage('Prod Environment') {
-            steps { echo "Deploying to Production..." }
+        stage('Deploy Phase') {
+            steps {
+                // This will print whichever environment you picked in the dropdown
+                echo "Deploying to ${params.ENVIRONMENT} environment..."
+            }
         }
     }
+    
     post {
         success { script { new com.helper.Notification(this).send("Success") } }
         failure { script { new com.helper.Notification(this).send("Failure") } }

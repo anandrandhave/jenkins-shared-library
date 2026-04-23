@@ -2,10 +2,7 @@ package com.helper
 
 class Notification implements Serializable {
     def script
-
-    Notification(script) {
-        this.script = script
-    }
+    Notification(script) { this.script = script }
 
     def send(String status) {
         def jobName  = script.env.JOB_NAME
@@ -17,6 +14,8 @@ class Notification implements Serializable {
         if (branch != "main" && status == "Started") { return }
 
         def subject = "${status.toUpperCase()}: ${jobName} [${buildNum}]"
+        
+        // This is the constant icon logic you requested
         def icon = (status == 'Success') ? '✅' : (status == 'Started' ? '🚀' : (status == 'Failure' ? '❌' : '⚠️'))
 
         def emailBody = """
@@ -28,12 +27,7 @@ class Notification implements Serializable {
         """.stripIndent()
 
         try {
-            script.emailext (
-                to: "admin251807@gmail.com",
-                subject: subject,
-                body: emailBody,
-                mimeType: 'text/html'
-            )
+            script.emailext(to: "admin251807@gmail.com", subject: subject, body: emailBody, mimeType: 'text/html')
         } catch (Exception e) { script.echo "Email Failed: ${e.message}" }
 
         try {
