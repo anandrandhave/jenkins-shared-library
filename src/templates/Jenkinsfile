@@ -1,10 +1,43 @@
-stage('Deploy') {
+@Library('my-shared-library') _
+
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
+    }
+
+    stages {
+        stage('Notify Start') {
+            steps {
+                script { 
+                    new com.helper.Notification(this).send("Started") 
+                }
+            }
+        }
+        
+        stage('Deployment') {
             steps {
                 script {
+                    echo "Deploying to ${params.ENVIRONMENT}..."
                     echo "--- DEBUG: Testing Failure Notification ---"
-                    // This command returns a non-zero exit code
-                    // Jenkins sees this as a 'HARD FAILURE'
+                    
+                    // This forces the build to fail immediately
                     sh "exit 1" 
                 }
             }
         }
+    }
+    
+    post {
+        success { 
+            script { new com.helper.Notification(this).send("Success") } 
+        }
+        failure { 
+            script { new com.helper.Notification(this).send("Failure") } 
+        }
+        unstable { 
+            script { new com.helper.Notification(this).send("Unstable") } 
+        }
+    }
+}
