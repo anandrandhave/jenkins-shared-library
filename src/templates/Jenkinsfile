@@ -16,24 +16,21 @@ pipeline {
             }
         }
 
-        stage('Dev Environment') {
+        stage('Deployment') {
             steps {
-                echo "Simulating an UNSTABLE build..."
+                echo "Deploying to ${params.ENVIRONMENT}..."
                 script {
-                    // This sets the build status to Unstable but lets the pipeline continue
+                    // TO TEST FAILURE: uncomment the line below
+                    // error "Forcing Failure"
+                    
+                    // TO TEST UNSTABLE: uncomment the line below
                     currentBuild.result = 'UNSTABLE'
                 }
             }
         }
-
-        stage('Deploy Phase') {
-            steps {
-                echo "Deploying to ${params.ENVIRONMENT} environment..."
-                echo "Even though it is unstable, this stage still runs."
-            }
-        }
     }
 
+    // THIS BLOCK MUST BE HERE TO SEND EMAILS AT THE END
     post {
         success { 
             script { new com.helper.Notification(this).send("Success") } 
