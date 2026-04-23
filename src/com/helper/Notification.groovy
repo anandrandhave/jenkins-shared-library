@@ -10,40 +10,43 @@ class Notification implements Serializable {
     def send(String status) {
         def jobName  = script.env.JOB_NAME
         def buildNum = script.env.BUILD_NUMBER
+        def buildUrl = script.env.BUILD_URL
         def branch   = script.env.BRANCH_NAME ?: "main"
+        // Keep duration consistent
         def duration = script.currentBuild.durationString.replace(' and counting', '')
 
-        // 1. Condition: Skip Started for non-main branches
-        if (branch != "main" && status == "Started") {
-            return 
-        }
+        if (branch != "main" && status == "Started") { return }
 
         def subject = "${status.toUpperCase()}: ${jobName} [${buildNum}]"
         
-        // 2. Logic for Icons (Added Unstable ⚠️)
-        def icon = '❓'
-        if (status == 'Success') icon = '✅'
-        else if (status == 'Started') icon = '🚀'
-        else if (status == 'Failure') icon = '❌'
-        else if (status == 'Unstable') icon = '⚠️'
+        // Logic for Icons
+        def icon = (status == 'Success') ? '✅' : (status == 'Started' ? '🚀' : (status == 'Failure' ? '❌' : '⚠️'))
 
-        // 3. Send Email
+        // Constant Body Template
+        def emailBody = """
+            <h3>${subject}</h3>
+            <b>Branch:</b> ${branch}<br>
+            <b>Status:</b> ${status}<br>
+            <b>Duration:</b> ${duration}<br>
+            <b>Console Output:</b> <a href='${buildUrl}'>${buildUrl}</a>
+        """.stripIndent()
+
+        // Send Email
         try {
             script.emailext (
                 to: "admin251807@gmail.com",
                 subject: subject,
-                body: "<h3>${subject}</h3><b>Status:</b> ${status}<br><b>Duration:</b> ${duration}",
+                body: emailBody,
                 mimeType: 'text/html'
             )
-        } catch (Exception e) { script.echo "Email Error: ${e.message}" }
+        } catch (Exception e) { script.echo "Email Failed: ${e.message}" }
 
-        // 4. Send Slack
-        def base = "https://hooks.slack.com/services/"
-        def token = "T0B024E98QG/B0AV1G8CJQ1/pZbUeTa4ONk1I1p4xNNwD7EC"
-        def payload = "{\"text\": \"${icon} *${subject}*\\n*Duration:* ${duration}\"}"
-        
+        // Send Slack
         try {
+            def base = "https://hooks.slack.com/services/"
+            def token = "T0B024E98QG/B0AV1G8CJQ1/pZbUeTa4ONk1I1p4xNNwD7EC"
+            def payload = "{\"text\": \"${icon} *${subject}*\\n*Duration:* ${duration}\\n${buildUrl}\"}"
             script.sh "curl -s -X POST -H 'Content-type: application/json' --data '${payload}' ${base}${token}"
-        } catch (Exception e) { script.echo "Slack Error: ${e.message}" }
+        } catch (Exception e) { script.echo "Slack Failed: ${e.message}" }
     }
 }

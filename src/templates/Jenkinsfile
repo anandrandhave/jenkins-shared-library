@@ -8,25 +8,28 @@ pipeline {
                 script { new com.helper.Notification(this).send("Started") }
             }
         }
-        stage('Deploy to Dev') {
-            steps { echo "Deploying to Dev..." }
+        stage('Dev Environment') {
+            steps {
+                echo "Deploying to Development..."
+                sh "sleep 2" // Simulating work
+            }
         }
-        stage('Deploy to Test') {
-            steps { echo "Deploying to Test..." }
+        stage('Test Environment') {
+            steps {
+                echo "Running Automated Tests..."
+                sh "sleep 2"
+            }
         }
-        stage('Deploy to Prod') {
-            steps { echo "Deploying to Prod..." }
+        stage('Prod Environment') {
+            steps {
+                echo "Deploying to Production..."
+                sh "sleep 2"
+            }
         }
     }
     post {
-        success {
-            script { new com.helper.Notification(this).send("Success") }
-        }
-        failure {
-            script { new com.helper.Notification(this).send("Failure") }
-        }
-        unstable {
-            script { new com.helper.Notification(this).send("Unstable") }
-        }
+        success { script { new com.helper.Notification(this).send("Success") } }
+        failure { script { new com.helper.Notification(this).send("Failure") } }
+        unstable { script { new com.helper.Notification(this).send("Unstable") } }
     }
 }
