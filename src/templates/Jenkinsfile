@@ -9,22 +9,13 @@ pipeline {
             }
         }
         stage('Dev Environment') {
-            steps {
-                echo "Deploying to Development..."
-                sh "sleep 2" // Simulating work
-            }
+            steps { echo "Deploying to Development..." }
         }
         stage('Test Environment') {
-            steps {
-                echo "Running Automated Tests..."
-                sh "sleep 2"
-            }
+            steps { echo "Deploying to Testing..." }
         }
         stage('Prod Environment') {
-            steps {
-                echo "Deploying to Production..."
-                sh "sleep 2"
-            }
+            steps { echo "Deploying to Production..." }
         }
     }
     post {

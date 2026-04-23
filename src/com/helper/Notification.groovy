@@ -12,17 +12,13 @@ class Notification implements Serializable {
         def buildNum = script.env.BUILD_NUMBER
         def buildUrl = script.env.BUILD_URL
         def branch   = script.env.BRANCH_NAME ?: "main"
-        // Keep duration consistent
         def duration = script.currentBuild.durationString.replace(' and counting', '')
 
         if (branch != "main" && status == "Started") { return }
 
         def subject = "${status.toUpperCase()}: ${jobName} [${buildNum}]"
-        
-        // Logic for Icons
         def icon = (status == 'Success') ? '✅' : (status == 'Started' ? '🚀' : (status == 'Failure' ? '❌' : '⚠️'))
 
-        // Constant Body Template
         def emailBody = """
             <h3>${subject}</h3>
             <b>Branch:</b> ${branch}<br>
@@ -31,7 +27,6 @@ class Notification implements Serializable {
             <b>Console Output:</b> <a href='${buildUrl}'>${buildUrl}</a>
         """.stripIndent()
 
-        // Send Email
         try {
             script.emailext (
                 to: "admin251807@gmail.com",
@@ -41,7 +36,6 @@ class Notification implements Serializable {
             )
         } catch (Exception e) { script.echo "Email Failed: ${e.message}" }
 
-        // Send Slack
         try {
             def base = "https://hooks.slack.com/services/"
             def token = "T0B024E98QG/B0AV1G8CJQ1/pZbUeTa4ONk1I1p4xNNwD7EC"
