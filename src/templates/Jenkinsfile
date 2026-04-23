@@ -1,26 +1,10 @@
-@Library('my-shared-library') _
-
-pipeline {
-    agent any
-    parameters {
-        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select environment')
-    }
-    stages {
-        stage('Notify Start') {
+stage('Deploy') {
             steps {
-                script { new com.helper.Notification(this).send("Started") }
+                script {
+                    echo "--- DEBUG: Testing Failure Notification ---"
+                    // This command returns a non-zero exit code
+                    // Jenkins sees this as a 'HARD FAILURE'
+                    sh "exit 1" 
+                }
             }
         }
-        stage('Deploy') {
-            steps {
-                echo "Deploying..."
-                sh "sleep 15" // Helps with Mailtrap rate limits
-            }
-        }
-    }
-    post {
-        success { script { new com.helper.Notification(this).send("Success") } }
-        failure { script { new com.helper.Notification(this).send("Failure") } }
-        unstable { script { new com.helper.Notification(this).send("Unstable") } }
-    }
-}
