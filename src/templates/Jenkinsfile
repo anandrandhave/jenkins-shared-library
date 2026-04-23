@@ -2,7 +2,7 @@
 
 pipeline {
     agent any
-    
+
     parameters {
         choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
     }
@@ -10,23 +10,33 @@ pipeline {
     stages {
         stage('Notify Start') {
             steps {
-                script { new com.helper.Notification(this).send("Started") }
+                script {
+                    // This is sending correctly for you
+                    new com.helper.Notification(this).send("Started")
+                }
             }
         }
-        stage('Dev Environment') {
-            steps { echo "Deploying to Dev..." }
-        }
-        stage('Test Environment') {
-            steps { echo "Deploying to Test..." }
-        }
-        stage('Prod Environment') {
-            steps { echo "Deploying to Prod..." }
+
+        stage('Deployment Environment') {
+            steps {
+                echo "Deploying to ${params.ENVIRONMENT} environment..."
+                // To test Success: Leave as is.
+                // To test Failure: Uncomment next line -> error "Failure"
+                // To test Unstable: Uncomment next line -> currentBuild.result = 'UNSTABLE'
+            }
         }
     }
-    
+
+    // THE POST BLOCK MUST BE OUTSIDE OF STAGES
     post {
-        success { script { new com.helper.Notification(this).send("Success") } }
-        failure { script { new com.helper.Notification(this).send("Failure") } }
-        unstable { script { new com.helper.Notification(this).send("Unstable") } }
+        success { 
+            script { new com.helper.Notification(this).send("Success") } 
+        }
+        failure { 
+            script { new com.helper.Notification(this).send("Failure") } 
+        }
+        unstable { 
+            script { new com.helper.Notification(this).send("Unstable") } 
+        }
     }
 }
