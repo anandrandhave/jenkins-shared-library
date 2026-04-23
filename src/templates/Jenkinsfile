@@ -3,7 +3,6 @@
 pipeline {
     agent any
 
-    // This block creates the ENVIRONMENT tab/dropdown
     parameters {
         choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
     }
@@ -12,7 +11,6 @@ pipeline {
         stage('Notify Start') {
             steps {
                 script {
-                    // This uses your constant logic from Notification.groovy
                     new com.helper.Notification(this).send("Started")
                 }
             }
@@ -20,16 +18,18 @@ pipeline {
 
         stage('Dev Environment') {
             steps {
-                echo "Simulating a build failure..."
-                // This triggers the 'failure' block in post
-                sh "exit 1" 
+                echo "Simulating an UNSTABLE build..."
+                script {
+                    // This sets the build status to Unstable but lets the pipeline continue
+                    currentBuild.result = 'UNSTABLE'
+                }
             }
         }
 
         stage('Deploy Phase') {
             steps {
-                // This prints the environment picked in the dropdown
                 echo "Deploying to ${params.ENVIRONMENT} environment..."
+                echo "Even though it is unstable, this stage still runs."
             }
         }
     }
