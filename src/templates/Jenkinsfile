@@ -2,38 +2,25 @@
 
 pipeline {
     agent any
-
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select environment')
     }
-
     stages {
         stage('Notify Start') {
             steps {
-                script {
-                    new com.helper.Notification(this).send("Started")
-                }
+                script { new com.helper.Notification(this).send("Started") }
             }
         }
-
-        stage('Deployment Environment') {
+        stage('Deploy') {
             steps {
-                echo "Deploying to ${params.ENVIRONMENT}..."
-                // WAIT HERE: This gives Mailtrap time to reset its rate limit
-                sh "sleep 15" 
+                echo "Deploying..."
+                sh "sleep 15" // Helps with Mailtrap rate limits
             }
         }
     }
-
     post {
-        success { 
-            script { new com.helper.Notification(this).send("Success") } 
-        }
-        failure { 
-            script { new com.helper.Notification(this).send("Failure") } 
-        }
-        unstable { 
-            script { new com.helper.Notification(this).send("Unstable") } 
-        }
+        success { script { new com.helper.Notification(this).send("Success") } }
+        failure { script { new com.helper.Notification(this).send("Failure") } }
+        unstable { script { new com.helper.Notification(this).send("Unstable") } }
     }
 }
