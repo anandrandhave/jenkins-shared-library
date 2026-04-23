@@ -10,36 +10,20 @@ pipeline {
     stages {
         stage('Notify Start') {
             steps {
-                script { 
-                    new com.helper.Notification(this).send("Started") 
-                }
+                script { new com.helper.Notification(this).send("Started") }
             }
         }
-        
         stage('Deployment') {
             steps {
-                script {
-                    echo "Deploying to ${params.ENVIRONMENT}..."
-                    echo "--- DEBUG: Testing UNSTABLE Notification ---"
-                    
-                    // This sets the result to Unstable but lets the stage finish
-                    currentBuild.result = 'UNSTABLE'
-                    
-                    echo "The build is now marked as UNSTABLE, but I am still running!"
-                }
+                echo "Deploying to ${params.ENVIRONMENT}..."
+                sh "sleep 15" 
             }
         }
     }
     
     post {
-        success { 
-            script { new com.helper.Notification(this).send("Success") } 
-        }
-        failure { 
-            script { new com.helper.Notification(this).send("Failure") } 
-        }
-        unstable { 
-            script { new com.helper.Notification(this).send("Unstable") } 
-        }
+        success { script { new com.helper.Notification(this).send("Success") } }
+        failure { script { new com.helper.Notification(this).send("Failure") } }
+        unstable { script { new com.helper.Notification(this).send("Unstable") } }
     }
 }
