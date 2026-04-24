@@ -10,9 +10,7 @@ pipeline {
     stages {
         stage('Notify Start') {
             steps {
-                script { 
-                    new com.helper.Notification(this).send("Started") 
-                }
+                script { new com.helper.Notification(this).send("Started") }
             }
         }
 
@@ -20,7 +18,6 @@ pipeline {
             parallel {
                 stage('Unit Tests') {
                     steps {
-                        // If tests fail, the stage fails but the pipeline continues as 'Unstable'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                             sh 'mvn test -Dtest=Unit* -DfailIfNoTests=false'
                         }
@@ -36,20 +33,24 @@ pipeline {
             }
         }
 
+        // ADDED/UPDATED STAGE HERE
+        stage('Generate Reports & Artifacts') {
+            steps {
+                // This triggers the standard Maven site + PDF automatically 
+                // due to the 'execution' block we added to your pom.xml
+                sh 'mvn site' 
+            }
+        }
+
         stage('Generate Custom PDF Report') {
             steps {
                 script {
-                    // Generates the standard Maven Project Site and PDF
-                    sh 'mvn site pdf:pdf'
-                    
-                    // Generates the custom professional layout
-                    // Ensure 'fpdf' is installed: pip install fpdf
                     sh """
-                    python3 generate_report.py \
-                    --jobName "${JOB_NAME}" \
-                    --buildNum "${BUILD_NUMBER}" \
-                    --branch "${GIT_BRANCH}" \
-                    --env "${params.ENVIRONMENT}"
+                        python3 generate_report.py \
+                        --job "${JOB_NAME}" \
+                        --build "${BUILD_NUMBER}" \
+                        --env "${params.ENVIRONMENT}" \
+                        --test_results "target/surefire-reports"
                     """
                 }
             }
@@ -58,7 +59,7 @@ pipeline {
         stage('Deployment') {
             steps {
                 echo "Deploying to ${params.ENVIRONMENT}..."
-                sh "sleep 5" 
+                sh "sleep 15" 
             }
         }
     }
@@ -66,6 +67,7 @@ pipeline {
     post {
         always {
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+            // This ensures all versions of your reports are saved
             archiveArtifacts artifacts: 'test-report.pdf, target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
             cleanWs()
         }
