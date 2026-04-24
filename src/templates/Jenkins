@@ -11,6 +11,7 @@ pipeline {
         stage('Notify Start') {
             steps {
                 script {
+                    // This sends the "Started" message you see in your Slack screenshot
                     new com.helper.Notification(this).send("Started")
                 }
             }
@@ -20,16 +21,17 @@ pipeline {
             parallel {
                 stage('Unit Tests') {
                     steps {
-                        // Removed jacoco:check to avoid missing rule parameters error
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            // Run tests and generate report. 
+                            // The 80% check now happens automatically via pom.xml.
                             sh 'mvn clean test jacoco:report -Djacoco.skip=false'
                         }
                     }
                 }
                 stage('Integration Tests') {
                     steps {
-                        // Added -Dsurefire.failIfNoSpecifiedTests=false to prevent exit code 1 if no tests match
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            // Added flag to prevent failure if no "Integration*" tests are found
                             sh 'mvn test -Dtest=Integration* -Dsurefire.failIfNoSpecifiedTests=false'
                         }
                     }
@@ -40,7 +42,7 @@ pipeline {
         stage('Generate Custom PDF Report') {
             steps {
                 script {
-                    // Includes --test_results for the Python parser to prevent Exit Code 2
+                    // Generates the PDF summary shown in your logs
                     sh "python3 generate_report.py --jobName '${JOB_NAME}' --buildNum '${BUILD_NUMBER}' --branch '${env.BRANCH_NAME ?: 'main'}' --env '${params.ENVIRONMENT}' --test_results 'target/surefire-reports'"
                 }
             }
@@ -48,7 +50,7 @@ pipeline {
         
         stage('Archive') {
             steps {
-                // Archive so the Slack links in the success block function correctly
+                // Important: This makes the PDF available for the Slack "Download" link
                 archiveArtifacts artifacts: 'target/pdf/*.pdf, *.pdf', fingerprint: true
             }
         }
@@ -58,12 +60,13 @@ pipeline {
         always {
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
             
-            // allowMissing: true prevents the pipeline from failing if the jacoco folder isn't generated
+            // Added allowMissing: true so the pipeline doesn't crash if JaCoCo skips a step
             publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, 
                 reportDir: 'target/site/jacoco', reportFiles: 'index.html', reportName: 'JaCoCo Report'])
         }
         success {
             script { 
+                // These generate the clickable URLs for your Slack message
                 def coverageUrl = "${env.BUILD_URL}JaCoCo_Report/"
                 def pdfUrl = "${env.BUILD_URL}artifact/test-report.pdf"
                 
@@ -71,7 +74,9 @@ pipeline {
             }
         }
         failure {
-            script { new com.helper.Notification(this).send("Failure") }
+            script { 
+                new com.helper.Notification(this).send("Failure") 
+            }
         }
         cleanup {
             cleanWs()
