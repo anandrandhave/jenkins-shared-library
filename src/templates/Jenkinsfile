@@ -20,14 +20,15 @@ pipeline {
             parallel {
                 stage('Unit Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        // If tests fail, the stage fails but the pipeline continues as 'Unstable'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                             sh 'mvn test -Dtest=Unit* -DfailIfNoTests=false'
                         }
                     }
                 }
                 stage('Integration Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                             sh 'mvn test -Dtest=Integration* -DfailIfNoTests=false'
                         }
                     }
@@ -38,11 +39,11 @@ pipeline {
         stage('Generate Custom PDF Report') {
             steps {
                 script {
-                    // Generates the standard Maven documentation
+                    // Generates the standard Maven Project Site and PDF
                     sh 'mvn site pdf:pdf'
                     
-                    // Generates the specific layout seen in your images
-                    // Requires 'fpdf' on Jenkins agent: pip install fpdf
+                    // Generates the custom professional layout
+                    // Ensure 'fpdf' is installed: pip install fpdf
                     sh """
                     python3 generate_report.py \
                     --jobName "${JOB_NAME}" \
@@ -65,7 +66,6 @@ pipeline {
     post {
         always {
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
-            // Archives both the custom test-report.pdf and the Maven generated PDF
             archiveArtifacts artifacts: 'test-report.pdf, target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
             cleanWs()
         }
