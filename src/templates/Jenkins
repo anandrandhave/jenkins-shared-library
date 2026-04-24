@@ -2,15 +2,14 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven3'
-        jdk 'JDK'
+        maven 'Maven'   // make sure Maven is configured in Jenkins
+        jdk 'JDK'       // make sure JDK is configured
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                checkout scm
+                git 'https://github.com/anandrandhave/jenkins-shared-library.git'
             }
         }
 
@@ -20,97 +19,48 @@ pipeline {
             }
         }
 
-        // ✅ Parallel Execution
         stage('Parallel Tests') {
             parallel {
-
                 stage('Unit Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=UnitTest test'
-                        }
+                        sh 'mvn -Dtest=UnitTest test'
                     }
                 }
 
                 stage('Integration Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=IntegrationTest test'
-                        }
+                        sh 'mvn -Dtest=IntegrationTest test'
                     }
                 }
 
                 stage('E2E Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=E2ETest test'
-                        }
+                        sh 'mvn -Dtest=E2ETest test'
                     }
                 }
             }
         }
     }
 
-    // ✅ FIXED SLACK NOTIFICATIONS
     post {
-
         success {
-            slackSend(
-                channel: '#all-admin',
-                message: """
-✅ *Build ${env.BUILD_NUMBER} SUCCESS*
-
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Stages:
-✔ Build
-✔ Unit Tests
-✔ Integration Tests
-✔ E2E Tests
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
-            )
+            withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_URL')]) {
+                sh """
+                curl -X POST -H 'Content-type: application/json' \
+                --data '{"text":"✅ SUCCESS: ${JOB_NAME} #${BUILD_NUMBER}\\nBuild URL: ${BUILD_URL}"}' \
+                $SLACK_URL
+                """
+            }
         }
 
         failure {
-            slackSend(
-                channel: '#all-admin',
-                message: """
-❌ *Build ${env.BUILD_NUMBER} FAILED*
-
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Failed Stages:
-⚠ Check Jenkins Stage View for exact failure
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
-            )
-        }
-
-        unstable {
-            slackSend(
-                channel: '#all-admin',
-                message: """
-⚠ *Build ${env.BUILD_NUMBER} UNSTABLE*
-
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Some tests failed (but pipeline continued)
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
-            )
+            withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_URL')]) {
+                sh """
+                curl -X POST -H 'Content-type: application/json' \
+                --data '{"text":"❌ FAILED: ${JOB_NAME} #${BUILD_NUMBER}\\nBuild URL: ${BUILD_URL}"}' \
+                $SLACK_URL
+                """
+            }
         }
     }
 }
