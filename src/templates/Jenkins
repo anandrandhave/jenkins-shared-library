@@ -6,33 +6,26 @@ pipeline {
         jdk 'JDK'
     }
 
-    environment {
-        ENVIRONMENT = 'dev'
-        FAILED_STAGE = ''
-    }
-
     stages {
 
         stage('Checkout') {
             steps {
-                script { env.FAILED_STAGE = 'Checkout' }
                 checkout scm
             }
         }
 
         stage('Build') {
             steps {
-                script { env.FAILED_STAGE = 'Build' }
                 sh 'mvn clean compile'
             }
         }
 
+        // ✅ Parallel Execution
         stage('Parallel Tests') {
             parallel {
 
                 stage('Unit Tests') {
                     steps {
-                        script { env.FAILED_STAGE = 'Unit Tests' }
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             sh 'mvn -Dtest=UnitTest test'
                         }
@@ -41,7 +34,6 @@ pipeline {
 
                 stage('Integration Tests') {
                     steps {
-                        script { env.FAILED_STAGE = 'Integration Tests' }
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             sh 'mvn -Dtest=IntegrationTest test'
                         }
@@ -50,7 +42,6 @@ pipeline {
 
                 stage('E2E Tests') {
                     steps {
-                        script { env.FAILED_STAGE = 'E2E Tests' }
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             sh 'mvn -Dtest=E2ETest test'
                         }
@@ -58,92 +49,68 @@ pipeline {
                 }
             }
         }
-
-        // ✅ Publish Test Results
-        stage('Publish Test Results') {
-            steps {
-                junit '**/target/surefire-reports/*.xml'
-            }
-        }
-
-        // ✅ Publish JaCoCo Coverage
-        stage('Coverage Report') {
-            steps {
-                publishHTML([
-                    reportDir: 'target/site/jacoco',
-                    reportFiles: 'index.html',
-                    reportName: 'JaCoCo Report'
-                ])
-            }
-        }
     }
 
+    // ✅ FIXED SLACK NOTIFICATIONS
     post {
 
         success {
-            script {
-                slackSend(
-                    channel: '#all-admin',
-                    message: """
-✅ *Build #${env.BUILD_NUMBER} SUCCESS*
+            slackSend(
+                channel: '#all-admin',
+                message: """
+✅ *Build ${env.BUILD_NUMBER} SUCCESS*
 
 📦 Job: ${env.JOB_NAME}
 🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: ${env.ENVIRONMENT}
+🌍 Environment: dev
 
-🧪 Tests: Completed Successfully
+🧪 Stages:
+✔ Build
+✔ Unit Tests
+✔ Integration Tests
+✔ E2E Tests
 
-🔗 Build: ${env.BUILD_URL}
-📄 Logs: ${env.BUILD_URL}console
-📊 Coverage: ${env.BUILD_URL}HTML_20Report/
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
 """
-                )
-            }
-        }
-
-        unstable {
-            script {
-                slackSend(
-                    channel: '#all-admin',
-                    message: """
-⚠ *Build #${env.BUILD_NUMBER} UNSTABLE*
-
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: ${env.ENVIRONMENT}
-
-❗ Some tests failed
-
-🔗 Build: ${env.BUILD_URL}
-📄 Logs: ${env.BUILD_URL}console
-📊 Coverage: ${env.BUILD_URL}HTML_20Report/
-"""
-                )
-            }
+            )
         }
 
         failure {
-            script {
-                slackSend(
-                    channel: '#all-admin',
-                    message: """
-❌ *Build #${env.BUILD_NUMBER} FAILED*
+            slackSend(
+                channel: '#all-admin',
+                message: """
+❌ *Build ${env.BUILD_NUMBER} FAILED*
 
 📦 Job: ${env.JOB_NAME}
 🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: ${env.ENVIRONMENT}
+🌍 Environment: dev
 
-🔥 Failed Stage: ${env.FAILED_STAGE}
+🧪 Failed Stages:
+⚠ Check Jenkins Stage View for exact failure
 
-🔗 Build: ${env.BUILD_URL}
-📄 Logs: ${env.BUILD_URL}console
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
 """
-                )
-            }
+            )
         }
 
-        always {
-            echo "Pipeline completed"
+        unstable {
+            slackSend(
+                channel: '#all-admin',
+                message: """
+⚠ *Build ${env.BUILD_NUMBER} UNSTABLE*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Some tests failed (but pipeline continued)
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
         }
     }
 }
