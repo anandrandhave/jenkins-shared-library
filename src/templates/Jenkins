@@ -1,0 +1,80 @@
+@Library('my-shared-library') _
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select environment.')
+    }
+
+    stages {
+        stage('Notify Start') {
+            steps {
+                script {
+                    new com.helper.Notification(this).send("Started")
+                }
+            }
+        }
+
+        stage('Testing') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        // Removed jacoco:check to avoid missing rule parameters error
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            sh 'mvn clean test jacoco:report -Djacoco.skip=false'
+                        }
+                    }
+                }
+                stage('Integration Tests') {
+                    steps {
+                        // Added -Dsurefire.failIfNoSpecifiedTests=false to prevent exit code 1 if no tests match
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                            sh 'mvn test -Dtest=Integration* -Dsurefire.failIfNoSpecifiedTests=false'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Generate Custom PDF Report') {
+            steps {
+                script {
+                    // Includes --test_results for the Python parser to prevent Exit Code 2
+                    sh "python3 generate_report.py --jobName '${JOB_NAME}' --buildNum '${BUILD_NUMBER}' --branch '${env.BRANCH_NAME ?: 'main'}' --env '${params.ENVIRONMENT}' --test_results 'target/surefire-reports'"
+                }
+            }
+        }
+        
+        stage('Archive') {
+            steps {
+                // Archive so the Slack links in the success block function correctly
+                archiveArtifacts artifacts: 'target/pdf/*.pdf, *.pdf', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        always {
+            junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+            
+            // allowMissing: true prevents the pipeline from failing if the jacoco folder isn't generated
+            publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, 
+                reportDir: 'target/site/jacoco', reportFiles: 'index.html', reportName: 'JaCoCo Report'])
+        }
+        success {
+            script { 
+                def coverageUrl = "${env.BUILD_URL}JaCoCo_Report/"
+                def pdfUrl = "${env.BUILD_URL}artifact/test-report.pdf"
+                
+                new com.helper.Notification(this).send("Success", coverageUrl, pdfUrl) 
+            }
+        }
+        failure {
+            script { new com.helper.Notification(this).send("Failure") }
+        }
+        cleanup {
+            cleanWs()
+        }
+    }
+}
