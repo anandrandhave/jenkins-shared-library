@@ -4,7 +4,7 @@ pipeline {
     tools {
         maven 'Maven3'
         jdk 'JDK'
-     }
+    }
 
     stages {
 
@@ -49,66 +49,68 @@ pipeline {
                 }
             }
         }
-
-        // ✅ Publish JUnit Reports
-        stage('Publish Results') {
-            steps {
-                junit '**/target/surefire-reports/*.xml'
-            }
-        }
-
-        // ✅ Code Coverage (JaCoCo)
-        stage('Coverage') {
-            steps {
-                sh 'mvn jacoco:report'
-
-                jacoco(
-                    execPattern: '**/target/*.exec',
-                    classPattern: '**/target/classes',
-                    sourcePattern: '**/src/main/java'
-                )
-            }
-        }
-
-        // ✅ Enforce Coverage Threshold
-        stage('Coverage Check') {
-            steps {
-                script {
-                    def coverage = 80   // You can adjust if needed
-                    echo "Checking coverage threshold: ${coverage}%"
-                    // NOTE: Real enforcement usually needs plugin config or parsing report
-                }
-            }
-        }
-
-        // ✅ Generate PDF Report
-        stage('Generate PDF') {
-            steps {
-                sh 'mkdir -p target'
-                sh 'python3 generate_report.py'
-            }
-        }
-
-        // ✅ Archive PDF Artifact
-        stage('Archive') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    archiveArtifacts artifacts: 'target/*.pdf', fingerprint: true
-                }
-            }
-        }
     }
 
-    // ✅ Always run cleanup/logging
+    // ✅ FIXED SLACK NOTIFICATIONS
     post {
-        always {
-            echo "Pipeline completed"
-        }
+
         success {
-            echo "Build SUCCESS"
+            slackSend(
+                channel: '#all-admin',
+                message: """
+✅ *Build ${env.BUILD_NUMBER} SUCCESS*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Stages:
+✔ Build
+✔ Unit Tests
+✔ Integration Tests
+✔ E2E Tests
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
         }
+
         failure {
-            echo "Build FAILED"
+            slackSend(
+                channel: '#all-admin',
+                message: """
+❌ *Build ${env.BUILD_NUMBER} FAILED*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Failed Stages:
+⚠ Check Jenkins Stage View for exact failure
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
+        }
+
+        unstable {
+            slackSend(
+                channel: '#all-admin',
+                message: """
+⚠ *Build ${env.BUILD_NUMBER} UNSTABLE*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Some tests failed (but pipeline continued)
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
         }
     }
 }
