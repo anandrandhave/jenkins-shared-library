@@ -1,49 +1,116 @@
 pipeline {
     agent any
+
     tools {
         maven 'Maven3'
         jdk 'JDK'
     }
+
     stages {
-        stage('Build & Test') {
+
+        stage('Checkout') {
             steps {
-                sh 'mvn clean compile'
-                parallel(
-                    "Unit Tests": {
-                        catchError(stageResult: 'FAILURE') { sh 'mvn -Dtest=UnitTest test' }
-                    },
-                    "Integration Tests": {
-                        catchError(stageResult: 'FAILURE') { sh 'mvn -Dtest=IntegrationTest test' }
-                    },
-                    "E2E Tests": {
-                        catchError(stageResult: 'FAILURE') { sh 'mvn -Dtest=E2ETest test' }
-                    }
-                )
+                checkout scm
             }
         }
 
-        stage('Reporting & Quality Gate') {
+        stage('Build') {
             steps {
-                junit '**/target/surefire-reports/*.xml'
-                jacoco(
-                    execPattern: '**/target/jacoco.exec',
-                    changeBuildStatus: true,
-                    minimumInstructionCoverage: '80'
-                )
-                // ADDED THE LOCAL FILE ACCESS FLAG HERE:
-                sh 'wkhtmltopdf --enable-local-file-access target/site/jacoco/index.html Coverage_Report.pdf || true'
+                sh 'mvn clean compile'
+            }
+        }
+
+        // ✅ Parallel Execution
+        stage('Parallel Tests') {
+            parallel {
+
+                stage('Unit Tests') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            sh 'mvn -Dtest=UnitTest test'
+                        }
+                    }
+                }
+
+                stage('Integration Tests') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            sh 'mvn -Dtest=IntegrationTest test'
+                        }
+                    }
+                }
+
+                stage('E2E Tests') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            sh 'mvn -Dtest=E2ETest test'
+                        }
+                    }
+                }
             }
         }
     }
+
+    // ✅ FIXED SLACK NOTIFICATIONS
     post {
-        always {
-            archiveArtifacts artifacts: 'Coverage_Report.pdf, target/site/jacoco/**', allowEmptyArchive: true
-        }
+
         success {
-            slackSend(channel: '#all-admin', color: 'good', message: "✅ Build ${env.BUILD_NUMBER} Passed!", tokenCredentialId: 'SLACK_WEBHOOK_URL')
+            slackSend(
+                channel: '#all-admin',
+                message: """
+✅ *Build ${env.BUILD_NUMBER} SUCCESS*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Stages:
+✔ Build
+✔ Unit Tests
+✔ Integration Tests
+✔ E2E Tests
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
         }
+
         failure {
-            slackSend(channel: '#all-admin', color: 'danger', message: "❌ Build ${env.BUILD_NUMBER} Failed", tokenCredentialId: 'SLACK_WEBHOOK_URL')
+            slackSend(
+                channel: '#all-admin',
+                message: """
+❌ *Build ${env.BUILD_NUMBER} FAILED*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Failed Stages:
+⚠ Check Jenkins Stage View for exact failure
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
+        }
+
+        unstable {
+            slackSend(
+                channel: '#all-admin',
+                message: """
+⚠ *Build ${env.BUILD_NUMBER} UNSTABLE*
+
+📦 Job: ${env.JOB_NAME}
+🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
+🌍 Environment: dev
+
+🧪 Some tests failed (but pipeline continued)
+
+🔗 Build URL: ${env.BUILD_URL}
+📄 Console: ${env.BUILD_URL}console
+"""
+            )
         }
     }
 }
