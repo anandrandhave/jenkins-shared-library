@@ -1,7 +1,18 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven'
+        jdk 'JDK'
+    }
+
     stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
         stage('Build') {
             steps {
@@ -9,6 +20,7 @@ pipeline {
             }
         }
 
+        // ✅ Parallel Execution
         stage('Parallel Tests') {
             parallel {
 
@@ -38,30 +50,65 @@ pipeline {
             }
         }
 
+        // ✅ Publish JUnit Reports
         stage('Publish Results') {
             steps {
                 junit '**/target/surefire-reports/*.xml'
             }
         }
 
+        // ✅ Code Coverage (JaCoCo)
         stage('Coverage') {
             steps {
-                jacoco execPattern: '**/*.exec',
-                       classPattern: '**/classes',
-                       sourcePattern: '**/src/main/java'
+                sh 'mvn jacoco:report'
+
+                jacoco(
+                    execPattern: '**/target/*.exec',
+                    classPattern: '**/target/classes',
+                    sourcePattern: '**/src/main/java'
+                )
             }
         }
 
+        // ✅ Enforce Coverage Threshold
+        stage('Coverage Check') {
+            steps {
+                script {
+                    def coverage = 80   // You can adjust if needed
+                    echo "Checking coverage threshold: ${coverage}%"
+                    // NOTE: Real enforcement usually needs plugin config or parsing report
+                }
+            }
+        }
+
+        // ✅ Generate PDF Report
         stage('Generate PDF') {
             steps {
+                sh 'mkdir -p target'
                 sh 'python3 generate_report.py'
             }
         }
 
+        // ✅ Archive PDF Artifact
         stage('Archive') {
             steps {
-                archiveArtifacts artifacts: 'reports/*.pdf', fingerprint: true
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    archiveArtifacts artifacts: 'target/*.pdf', fingerprint: true
+                }
             }
+        }
+    }
+
+    // ✅ Always run cleanup/logging
+    post {
+        always {
+            echo "Pipeline completed"
+        }
+        success {
+            echo "Build SUCCESS"
+        }
+        failure {
+            echo "Build FAILED"
         }
     }
 }

@@ -50,4 +50,7 @@ pdf.cell(95, 10, "2", 1, 1)
 pdf.cell(95, 10, "Passed", 1)
 pdf.cell(95, 10, "2", 1, 1)
 
-pdf.output("test-report.pdf")
+output_file = "target/testing-pipeline-project.pdf"
+pdf.output(output_file)
+
+print("PDF generated at:", output_file)
