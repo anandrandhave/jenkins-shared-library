@@ -7,7 +7,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -20,10 +19,9 @@ pipeline {
             }
         }
 
-        // ✅ Parallel Execution
+        // ✅ Parallel Execution of independent test suites
         stage('Parallel Tests') {
             parallel {
-
                 stage('Unit Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -49,67 +47,55 @@ pipeline {
                 }
             }
         }
+
+        // ✅ Quality Gate, Reporting & PDF Generation
+        stage('Reporting & Quality Gate') {
+            steps {
+                // 1. Publish JUnit Results (Visible in Jenkins UI)
+                junit '**/target/surefire-reports/*.xml'
+                
+                // 2. JaCoCo Coverage Threshold (Fail build if < 80%)
+                jacoco(
+                    execPattern: '**/target/jacoco.exec',
+                    classPattern: '**/target/classes',
+                    sourcePattern: '**/src/main/java',
+                    // The "80% gate" requirement:
+                    changeBuildStatus: true,
+                    minimumInstructionCoverage: '80'
+                )
+
+                // 3. Generate PDF Report (Using wkhtmltopdf or Maven PDF plugin)
+                // If you use wkhtmltopdf:
+                sh 'wkhtmltopdf target/site/jacoco/index.html Coverage_Report.pdf || true'
+            }
+        }
     }
 
-    // ✅ FIXED SLACK NOTIFICATIONS
     post {
+        always {
+            // ✅ Archive test artifacts and the PDF report
+            archiveArtifacts artifacts: 'target/*.pdf, target/site/jacoco/**', allowEmptyArchive: true
+        }
 
         success {
             slackSend(
                 channel: '#all-admin',
-                message: """
-✅ *Build ${env.BUILD_NUMBER} SUCCESS*
-
+                color: 'good',
+                message: """✅ *Build ${env.BUILD_NUMBER} SUCCESS*
 📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Stages:
-✔ Build
-✔ Unit Tests
-✔ Integration Tests
-✔ E2E Tests
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
+🧪 Quality Gate Passed (>80% Coverage)
+🔗 Build URL: ${env.BUILD_URL}"""
             )
         }
 
         failure {
             slackSend(
                 channel: '#all-admin',
-                message: """
-❌ *Build ${env.BUILD_NUMBER} FAILED*
-
+                color: 'danger',
+                message: """❌ *Build ${env.BUILD_NUMBER} FAILED*
 📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Failed Stages:
-⚠ Check Jenkins Stage View for exact failure
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
-            )
-        }
-
-        unstable {
-            slackSend(
-                channel: '#all-admin',
-                message: """
-⚠ *Build ${env.BUILD_NUMBER} UNSTABLE*
-
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Some tests failed (but pipeline continued)
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
+⚠ Check if tests failed or Coverage was < 80%
+🔗 Build URL: ${env.BUILD_URL}"""
             )
         }
     }
