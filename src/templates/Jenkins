@@ -1,102 +1,49 @@
 pipeline {
     agent any
-
     tools {
         maven 'Maven3'
         jdk 'JDK'
     }
-
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Build') {
+        stage('Build & Test') {
             steps {
                 sh 'mvn clean compile'
+                parallel(
+                    "Unit Tests": {
+                        catchError(stageResult: 'FAILURE') { sh 'mvn -Dtest=UnitTest test' }
+                    },
+                    "Integration Tests": {
+                        catchError(stageResult: 'FAILURE') { sh 'mvn -Dtest=IntegrationTest test' }
+                    },
+                    "E2E Tests": {
+                        catchError(stageResult: 'FAILURE') { sh 'mvn -Dtest=E2ETest test' }
+                    }
+                )
             }
         }
 
-        // ✅ Parallel Execution of independent test suites
-        stage('Parallel Tests') {
-            parallel {
-                stage('Unit Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=UnitTest test'
-                        }
-                    }
-                }
-
-                stage('Integration Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=IntegrationTest test'
-                        }
-                    }
-                }
-
-                stage('E2E Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=E2ETest test'
-                        }
-                    }
-                }
-            }
-        }
-
-        // ✅ Quality Gate, Reporting & PDF Generation
         stage('Reporting & Quality Gate') {
             steps {
-                // 1. Publish JUnit Results (Visible in Jenkins UI)
                 junit '**/target/surefire-reports/*.xml'
-                
-                // 2. JaCoCo Coverage Threshold (Fail build if < 80%)
                 jacoco(
                     execPattern: '**/target/jacoco.exec',
-                    classPattern: '**/target/classes',
-                    sourcePattern: '**/src/main/java',
-                    // The "80% gate" requirement:
                     changeBuildStatus: true,
                     minimumInstructionCoverage: '80'
                 )
-
-                // 3. Generate PDF Report (Using wkhtmltopdf or Maven PDF plugin)
-                // If you use wkhtmltopdf:
-                sh 'wkhtmltopdf target/site/jacoco/index.html Coverage_Report.pdf || true'
+                // ADDED THE LOCAL FILE ACCESS FLAG HERE:
+                sh 'wkhtmltopdf --enable-local-file-access target/site/jacoco/index.html Coverage_Report.pdf || true'
             }
         }
     }
-
     post {
         always {
-            // ✅ Archive test artifacts and the PDF report
-            archiveArtifacts artifacts: 'target/*.pdf, target/site/jacoco/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'Coverage_Report.pdf, target/site/jacoco/**', allowEmptyArchive: true
         }
-
         success {
-            slackSend(
-                channel: '#all-admin',
-                color: 'good',
-                message: """✅ *Build ${env.BUILD_NUMBER} SUCCESS*
-📦 Job: ${env.JOB_NAME}
-🧪 Quality Gate Passed (>80% Coverage)
-🔗 Build URL: ${env.BUILD_URL}"""
-            )
+            slackSend(channel: '#all-admin', color: 'good', message: "✅ Build ${env.BUILD_NUMBER} Passed!", tokenCredentialId: 'SLACK_WEBHOOK_URL')
         }
-
         failure {
-            slackSend(
-                channel: '#all-admin',
-                color: 'danger',
-                message: """❌ *Build ${env.BUILD_NUMBER} FAILED*
-📦 Job: ${env.JOB_NAME}
-⚠ Check if tests failed or Coverage was < 80%
-🔗 Build URL: ${env.BUILD_URL}"""
-            )
+            slackSend(channel: '#all-admin', color: 'danger', message: "❌ Build ${env.BUILD_NUMBER} Failed", tokenCredentialId: 'SLACK_WEBHOOK_URL')
         }
     }
 }
