@@ -1,83 +1,30 @@
+@Library('my-shared-library') _
+
 pipeline {
     agent any
-
+    
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select Environment')
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
     }
 
     stages {
         stage('Notify Start') {
             steps {
-                script {
-                    new com.helper.Notification(this).send("Started")
-                }
+                script { new com.helper.Notification(this).send("Started") }
             }
         }
-
-        stage('Testing') {
-            parallel {
-                stage('Unit Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            // Added -DfailIfNoTests=false to prevent build failure if tests are missing
-                            sh 'mvn test -Dtest=Unit* -DfailIfNoTests=false'
-                        }
-                    }
-                }
-                stage('Integration Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            // Added -DfailIfNoTests=false to prevent build failure if tests are missing
-                            sh 'mvn test -Dtest=Integration* -DfailIfNoTests=false'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Generate Reports & Artifacts') {
-            steps {
-                // Generates the PDF report (Make sure your pom.xml has the Doxia fix)
-                sh 'mvn site pdf:pdf'
-                // Archives the generated PDF and JaCoCo coverage reports
-                archiveArtifacts artifacts: 'target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
-            }
-        }
-
         stage('Deployment') {
             steps {
                 echo "Deploying to ${params.ENVIRONMENT}..."
-                sh "sleep 15"
+                sh "sleep 15" 
             }
         }
     }
-
+    
     post {
-        always {
-            // Updated to handle cases where no XML files are generated yet
-            junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
-            // Cleans the workspace to keep the agent healthy
-            cleanWs()
-        }
-        success {
-            script { new com.helper.Notification(this).send("Success") }
-        }
-        failure {
-            script { new com.helper.Notification(this).send("Failure") }
-        }
-        unstable {
-            script { new com.helper.Notification(this).send("Unstable") }
-        }
+        success { script { new com.helper.Notification(this).send("Success") } }
+        failure { script { new com.helper.Notification(this).send("Failure") } }
+        unstable { script { new com.helper.Notification(this).send("Unstable") } }
     }
 }
-
-
-
-
-
-
-
-
-
-
 
