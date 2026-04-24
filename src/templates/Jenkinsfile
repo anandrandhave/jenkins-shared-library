@@ -20,16 +20,17 @@ pipeline {
             parallel {
                 stage('Unit Tests') {
                     steps {
-                        // Enforces 80% coverage check. Stage fails if below threshold.
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                            sh 'mvn clean test jacoco:report jacoco:check -Djacoco.haltOnFailure=true'
+                            // CLEAN COMMAND: Just 'mvn clean test'. 
+                            // The pom.xml handles the coverage report and 80% check.
+                            sh 'mvn clean test -Djacoco.skip=false'
                         }
                     }
                 }
                 stage('Integration Tests') {
                     steps {
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                            sh 'mvn test -Dtest=Integration* -DfailIfNoTests=false'
+                            sh 'mvn test -Dtest=Integration* -Dsurefire.failIfNoSpecifiedTests=false'
                         }
                     }
                 }
@@ -39,7 +40,6 @@ pipeline {
         stage('Generate Custom PDF Report') {
             steps {
                 script {
-                    // Includes --test_results to match the Python script's updated parser
                     sh "python3 generate_report.py --jobName '${JOB_NAME}' --buildNum '${BUILD_NUMBER}' --branch '${env.BRANCH_NAME ?: 'main'}' --env '${params.ENVIRONMENT}' --test_results 'target/surefire-reports'"
                 }
             }
@@ -47,7 +47,6 @@ pipeline {
         
         stage('Archive') {
             steps {
-                // Archive files so they are available for the Slack links
                 archiveArtifacts artifacts: 'target/pdf/*.pdf, *.pdf', fingerprint: true
             }
         }
@@ -57,22 +56,23 @@ pipeline {
         always {
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
             
-            // Publishes the HTML coverage report to the Jenkins sidebar
-            publishHTML([allowMissing: false, alwaysLinkToLastBuild: true, keepAll: true, 
+            // allowMissing: true is vital because if tests fail, the directory might not exist yet
+            publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, 
                 reportDir: 'target/site/jacoco', reportFiles: 'index.html', reportName: 'JaCoCo Report'])
         }
         success {
             script { 
-                // Create links to be sent to Slack
+                // These generate the links for Slack
                 def coverageUrl = "${env.BUILD_URL}JaCoCo_Report/"
                 def pdfUrl = "${env.BUILD_URL}artifact/test-report.pdf"
                 
-                // Pass the status and report links to your notification helper
                 new com.helper.Notification(this).send("Success", coverageUrl, pdfUrl) 
             }
         }
         failure {
-            script { new com.helper.Notification(this).send("Failure") }
+            script { 
+                new com.helper.Notification(this).send("Failure") 
+            }
         }
         cleanup {
             cleanWs()
