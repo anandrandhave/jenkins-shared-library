@@ -1,60 +1,67 @@
-@Library('my-shared-library') _
-
 pipeline {
     agent any
-    
-    parameters {
-        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select environment.')
-    }
 
     stages {
-        stage('Notify Start') {
+
+        stage('Build') {
             steps {
-                script { new com.helper.Notification(this).send("Started") }
+                sh 'mvn clean compile'
             }
         }
 
-        stage('Testing') {
+        stage('Parallel Tests') {
             parallel {
+
                 stage('Unit Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn test -Dtest=Unit* -DfailIfNoTests=false'
+                            sh 'mvn -Dtest=UnitTest test'
                         }
                     }
                 }
+
                 stage('Integration Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn test -Dtest=Integration* -DfailIfNoTests=false'
+                            sh 'mvn -Dtest=IntegrationTest test'
+                        }
+                    }
+                }
+
+                stage('E2E Tests') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            sh 'mvn -Dtest=E2ETest test'
                         }
                     }
                 }
             }
         }
 
-        stage('Generate Reports & Artifacts') {
+        stage('Publish Results') {
             steps {
-                // This command will now succeed with the new pom.xml
-                sh 'mvn site pdf:pdf'
-                archiveArtifacts artifacts: 'target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
+                junit '**/target/surefire-reports/*.xml'
             }
         }
 
-        stage('Deployment') {
+        stage('Coverage') {
             steps {
-                echo "Deploying to ${params.ENVIRONMENT}..."
-                sh "sleep 15" 
+                jacoco execPattern: '**/*.exec',
+                       classPattern: '**/classes',
+                       sourcePattern: '**/src/main/java'
             }
         }
-    }
-    
-    post {
-        always {
-            junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
-            cleanWs()
+
+        stage('Generate PDF') {
+            steps {
+                sh 'python3 generate_report.py'
+            }
         }
-        success { script { new com.helper.Notification(this).send("Success") } }
-        failure { script { new com.helper.Notification(this).send("Failure") } }
+
+        stage('Archive') {
+            steps {
+                archiveArtifacts artifacts: 'reports/*.pdf', fingerprint: true
+            }
+        }
     }
 }
