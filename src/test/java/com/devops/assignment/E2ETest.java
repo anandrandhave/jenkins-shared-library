@@ -2,11 +2,12 @@ import com.devops.app.Calculator;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class IntegrationTest {
+public class E2ETest {
 
     @Test
-    void testSubtract() {
+    void testFlow() {
         Calculator calc = new Calculator();
-        assertEquals(2, calc.subtract(5, 3));
+        int result = calc.add(2, 3);
+        assertEquals(5, result);
     }
 }
