@@ -35,6 +35,7 @@ pipeline {
 
         stage('Generate Reports & Artifacts') {
             steps {
+                // This sh command will now work because of the pom.xml updates
                 sh 'mvn site pdf:pdf'
                 archiveArtifacts artifacts: 'target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
             }
