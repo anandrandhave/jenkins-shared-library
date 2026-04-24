@@ -4,13 +4,15 @@ pipeline {
     agent any
     
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select the environment to deploy to.')
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'test', 'prod'], description: 'Select environment.')
     }
 
     stages {
         stage('Notify Start') {
             steps {
-                script { new com.helper.Notification(this).send("Started") }
+                script { 
+                    new com.helper.Notification(this).send("Started") 
+                }
             }
         }
 
@@ -33,18 +35,29 @@ pipeline {
             }
         }
 
-        stage('Generate Reports & Artifacts') {
+        stage('Generate Custom PDF Report') {
             steps {
-                // This sh command will now work because of the pom.xml updates
-                sh 'mvn site pdf:pdf'
-                archiveArtifacts artifacts: 'target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
+                script {
+                    // Generates the standard Maven documentation
+                    sh 'mvn site pdf:pdf'
+                    
+                    // Generates the specific layout seen in your images
+                    // Requires 'fpdf' on Jenkins agent: pip install fpdf
+                    sh """
+                    python3 generate_report.py \
+                    --jobName "${JOB_NAME}" \
+                    --buildNum "${BUILD_NUMBER}" \
+                    --branch "${GIT_BRANCH}" \
+                    --env "${params.ENVIRONMENT}"
+                    """
+                }
             }
         }
 
         stage('Deployment') {
             steps {
                 echo "Deploying to ${params.ENVIRONMENT}..."
-                sh "sleep 15" 
+                sh "sleep 5" 
             }
         }
     }
@@ -52,6 +65,8 @@ pipeline {
     post {
         always {
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+            // Archives both the custom test-report.pdf and the Maven generated PDF
+            archiveArtifacts artifacts: 'test-report.pdf, target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
             cleanWs()
         }
         success { script { new com.helper.Notification(this).send("Success") } }
