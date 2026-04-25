@@ -7,8 +7,7 @@ pipeline {
     }
 
     environment {
-        SONAR_PROJECT_KEY = 'OT-Microservices-Employee-Service'
-        SONAR_HOST_URL   = 'http://192.168.1.7:9000'
+        SONARQUBE = 'SonarQube'
     }
 
     stages {
@@ -39,19 +38,18 @@ pipeline {
         stage('E2E Tests') {
             steps {
                 echo "Running E2E Tests..."
-                sh 'echo "E2E Passed"'
+                sh 'echo E2E Passed'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv("${SONARQUBE}") {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-
                         sh '''
                         mvn sonar:sonar \
-                        -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.projectKey=OT-Microservices-Employee-Service \
+                        -Dsonar.host.url=http://192.168.1.7:9000 \
                         -Dsonar.login=$SONAR_TOKEN
                         '''
                     }
@@ -76,30 +74,42 @@ pipeline {
         stage('Generate & Archive PDF') {
             steps {
                 sh '''
+                echo "===== START PDF GENERATION ====="
+
                 mkdir -p target/site
 
-                cat > target/site/full-report.html <<EOF
-                <html><body><h1>Build Report</h1>
-                EOF
+                echo "Creating HTML report..."
 
-                cat target/site/summary.html >> target/site/full-report.html || true
-                cat target/site/surefire-report.html >> target/site/full-report.html || true
-                cat target/site/jacoco/index.html >> target/site/full-report.html || true
+cat <<EOF > target/site/full-report.html
+<html>
+<head>
+    <title>CI/CD Report</title>
+</head>
+<body>
+    <h1 style="color:blue;">CI/CD Pipeline Report</h1>
+    <h2>Summary</h2>
+EOF
+
+                # Append reports safely
+                if [ -f target/site/index.html ]; then
+                    cat target/site/index.html >> target/site/full-report.html
+                fi
+
+                if [ -f target/site/surefire-report.html ]; then
+                    cat target/site/surefire-report.html >> target/site/full-report.html
+                fi
 
                 echo "</body></html>" >> target/site/full-report.html
 
-                cd target/site
+                echo "===== GENERATING PDF ====="
 
-                wkhtmltopdf \
-                --enable-local-file-access \
-                full-report.html report.pdf || true
+                wkhtmltopdf target/site/full-report.html target/site/report.pdf
+
+                echo "===== VERIFY FILE ====="
+                ls -l target/site
                 '''
-            }
 
-            post {
-                always {
-                    archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: true
-                }
+                archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
             }
         }
     }
@@ -108,39 +118,27 @@ pipeline {
         always {
             script {
 
-                def buildStatus = currentBuild.currentResult
-
-                def unit  = "✅"
-                def integ = "✅"
-                def e2e   = "✅"
-
-                if (buildStatus != "SUCCESS") {
-                    unit  = "❌"
-                    integ = "❌"
-                    e2e   = "❌"
-                }
+                def status = currentBuild.currentResult
+                def icon = status == 'SUCCESS' ? ':heavy_check_mark:' : ':x:'
 
                 def pdfLink = "${env.BUILD_URL}artifact/target/site/report.pdf"
 
-                echo "📄 PDF LINK: ${pdfLink}"
-
                 slackSend(
                     channel: '#all-admin',
-                    color: (buildStatus == 'SUCCESS') ? 'good' : 'danger',
+                    color: status == 'SUCCESS' ? 'good' : 'danger',
                     message: """
-*🚀 Pipeline Report*
-
-*Job:* ${env.JOB_NAME}
-*Build:* #${env.BUILD_NUMBER}
-*Status:* ${buildStatus}
-
 *Pipeline Summary:*
-${unit} Unit Tests
-${integ} Integration Tests
-${e2e} E2E Tests
+${icon} Unit Tests
+${icon} Integration Tests
+${icon} E2E Tests
 :heavy_check_mark: Reports Generated
 
+*Build:* #${env.BUILD_NUMBER}
+*Status:* ${status}
+*Job:* ${env.JOB_NAME}
+
 📄 *PDF Report:* ${pdfLink}
+🔗 *Build URL:* ${env.BUILD_URL}
 """
                 )
             }
