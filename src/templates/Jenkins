@@ -55,27 +55,61 @@ pipeline {
             }
         }
 
-        // ✅ IMPORTANT: Generate Reports (FIX)
-        stage('Generate Site Report') {
+        // ✅ Generate Maven Site (HTML Reports)
+        stage('Generate Site') {
             steps {
-                sh 'mvn clean verify surefire-report:report site'
+                sh 'mvn clean verify site'
             }
         }
 
-        // ✅ DEBUG (to verify files exist)
-        stage('Debug Site') {
+        // ✅ DEBUG 1: Check site folder
+        stage('Debug Site Files') {
             steps {
-                sh 'ls -l target/site/'
+                sh '''
+                echo "===== LIST SITE FILES ====="
+                ls -l target/site/ || true
+                '''
             }
         }
 
-        // ✅ FIXED PDF (use real report file)
+        // ✅ DEBUG 2: Check important files
+        stage('Debug Key Files') {
+            steps {
+                sh '''
+                echo "===== CHECK IMPORTANT FILES ====="
+                ls target/site/index.html || true
+                ls target/site/surefire-report.html || true
+                ls target/site/jacoco/index.html || true
+                '''
+            }
+        }
+
+        // ✅ DEBUG 3: Check wkhtmltopdf
+        stage('Check wkhtmltopdf') {
+            steps {
+                sh '''
+                echo "===== WKHTMLTOPDF VERSION ====="
+                wkhtmltopdf -V || true
+                '''
+            }
+        }
+
+        // ✅ Generate PDF (FINAL FIXED)
         stage('Generate PDF') {
             steps {
                 sh '''
+                echo "===== GENERATING PDF ====="
+
                 wkhtmltopdf \
                 --enable-local-file-access \
-                target/site/surefire-report.html target/site/report.pdf
+                --disable-smart-shrinking \
+                --no-stop-slow-scripts \
+                --load-error-handling ignore \
+                --load-media-error-handling ignore \
+                target/site/index.html target/site/report.pdf
+
+                echo "===== PDF GENERATED FILES ====="
+                ls -l target/site/report.pdf || true
                 '''
             }
         }
@@ -88,7 +122,7 @@ pipeline {
         }
     }
 
-    // ✅ POST SECTION
+    // ✅ POST SECTION (Slack + Reports)
     post {
 
         always {
@@ -112,6 +146,7 @@ Stages:
 ✔ Unit Tests
 ✔ Integration Tests
 ✔ E2E Tests
+✔ PDF Generated
 
 Build URL: ${env.BUILD_URL}
 Console: ${env.BUILD_URL}console
