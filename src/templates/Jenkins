@@ -55,26 +55,27 @@ pipeline {
             }
         }
 
-        // ✅ Generate Site (HTML report)
+        // ✅ IMPORTANT: Generate Reports (FIX)
         stage('Generate Site Report') {
             steps {
-                sh 'mvn clean verify site'
+                sh 'mvn clean verify surefire-report:report site'
             }
         }
 
+        // ✅ DEBUG (to verify files exist)
         stage('Debug Site') {
             steps {
                 sh 'ls -l target/site/'
             }
         }
 
-        // ✅ FIXED PDF GENERATION
+        // ✅ FIXED PDF (use real report file)
         stage('Generate PDF') {
             steps {
                 sh '''
                 wkhtmltopdf \
                 --enable-local-file-access \
-                target/site/index.html target/site/report.pdf
+                target/site/surefire-report.html target/site/report.pdf
                 '''
             }
         }
@@ -87,7 +88,7 @@ pipeline {
         }
     }
 
-    // ✅ POST SECTION (END)
+    // ✅ POST SECTION
     post {
 
         always {
@@ -128,7 +129,6 @@ Console: ${env.BUILD_URL}console
 ❌ Build FAILED
 
 Job: ${env.JOB_NAME}
-Branch: ${env.BRANCH_NAME ?: 'N/A'}
 Environment: ${env.ENV}
 
 Check logs:
