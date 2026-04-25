@@ -1,4 +1,5 @@
 pipeline {
+
     agent any
 
     tools {
@@ -147,7 +148,17 @@ EOF
 
                 cd target/site
 
-                wkhtmltopdf full-report.html report.pdf
+                wkhtmltopdf \
+                --enable-local-file-access \
+                -- page-size A4 \
+                --margin-top10 \
+                --margine-bottom 10 \
+                --margin-left 10 \
+                --margin-right 10 \
+                --zoom 0.9 \
+                --load-error-handling ignore \
+                --load-media-error-handling ignore \
+                full-report.html report.pdf
 
                 ls -l report.pdf
                 '''
