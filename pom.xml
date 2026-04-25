@@ -16,6 +16,7 @@
   </properties>
 
   <dependencies>
+    <!-- JUnit 5 -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -26,10 +27,12 @@
 
   <build>
     <plugins>
+
+      <!-- Surefire (Test Runner) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0</version>
+        <version>3.2.5</version>
         <configuration>
           <includes>
             <include>**/*Test.java</include>
@@ -40,6 +43,7 @@
         </configuration>
       </plugin>
 
+      <!-- JaCoCo Coverage -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -60,26 +64,13 @@
         </executions>
       </plugin>
 
+      <!-- Site Plugin (HTML reports) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>3.1.2</version>
+        <artifactId>maven-site-plugin</artifactId>
+        <version>4.0.0-M9</version>
       </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-pdf-plugin</artifactId>
-        <version>1.6.1</version>
-        <executions>
-          <execution>
-            <id>pdf</id>
-            <phase>site</phase>
-            <goals>
-              <goal>pdf</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 
@@ -87,19 +78,8 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-report-plugin</artifactId>
-        <version>3.1.2</version>
-      </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <reportSets>
-          <reportSet>
-            <reports>
-              <report>report</report>
-            </reports>
-          </reportSet>
-        </reportSets>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>3.5.0</version>
       </plugin>
     </plugins>
   </reporting>

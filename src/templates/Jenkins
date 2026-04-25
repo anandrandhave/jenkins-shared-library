@@ -16,92 +16,83 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'mvn clean compile'
+                sh 'mvn clean install -DskipTests'
             }
         }
 
-        // ✅ Parallel Execution
         stage('Parallel Tests') {
             parallel {
 
                 stage('Unit Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=UnitTest test'
-                        }
+                        sh 'mvn -Dtest=UnitTest test'
                     }
                 }
 
                 stage('Integration Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=IntegrationTest test'
-                        }
+                        sh 'mvn -Dtest=IntegrationTest test'
                     }
                 }
 
                 stage('E2E Tests') {
                     steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=E2ETest test'
-                        }
+                        sh 'mvn -Dtest=E2ETest test'
                     }
                 }
             }
         }
 
-        // ✅ ADD THIS STAGE (PDF + Coverage)
-        stage('Generate Reports') {
+        stage('Generate Site Report') {
             steps {
-                sh 'mvn site pdf:pdf'
+                sh 'mvn site'
             }
         }
 
-        // ✅ ADD THIS (Artifacts)
+        stage('Generate PDF') {
+            steps {
+                sh '''
+                wkhtmltopdf target/site/index.html target/site/report.pdf
+                '''
+            }
+        }
+
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: 'target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
+                archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
+                junit '**/target/surefire-reports/*.xml'
             }
         }
     }
 
-    // ✅ ADD THIS (Test Results + Slack)
     post {
-
         always {
-            junit '**/target/surefire-reports/*.xml'
-        }
+            script {
+                def msg = """Job: ${env.JOB_NAME}
 
-        success {
-            slackSend(
-                channel: '#all-admin',
-                teamDomain: 'admin-ngv1996',              // ✅ MUST MATCH
-                tokenCredentialId: 'my-slack-token-id',  // ✅ MUST MATCH
-                message: """
-✅ Build SUCCESS
+Branch: ${env.BRANCH_NAME ?: 'N/A'}
 
-Job: ${env.JOB_NAME}
-Build: ${env.BUILD_NUMBER}
+Environment: dev
 
-🔗 ${env.BUILD_URL}
+Stages:
+✔ Build
+✔ Unit Tests
+✔ Integration Tests
+✔ E2E Tests
+
+Build URL: ${env.BUILD_URL}
+
+Console: ${env.BUILD_URL}console
+
+PDF Report: ${env.BUILD_URL}artifact/target/site/report.pdf
 """
-            )
-        }
 
-        failure {
-            slackSend(
-                channel: '#all-admin',
-                teamDomain: 'admin-ngv1996',
-                tokenCredentialId: 'my-slack-token-id',
-                message: """
-❌ Build FAILED
-
-Job: ${env.JOB_NAME}
-Build: ${env.BUILD_NUMBER}
-
-🔗 ${env.BUILD_URL}
-"""
-            )
+                slackSend(
+                    channel: '#all-admin',
+                    message: msg,
+                    color: currentBuild.currentResult == 'SUCCESS' ? 'good' : 'danger'
+                )
+            }
         }
     }
 }
