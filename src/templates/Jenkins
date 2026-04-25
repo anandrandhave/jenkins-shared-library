@@ -5,7 +5,10 @@ pipeline {
         maven 'Maven3'
         jdk 'JDK'
     }
-
+    //🔴 ADDED
+        sonarQube 'SonarScanner'
+    }
+   
     environment {
         JOB_NAME = "OT-Microservices-Employee-Service"
         ENV = "dev"
@@ -59,6 +62,42 @@ pipeline {
         stage('Aggregate Reports') {
             steps {
                 sh 'mvn verify'
+            }
+        }
+        
+        // 🔴 ===============================
+        // 🔴 ADDED: SonarQube Analysis
+        // 🔴 ===============================
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                        mvn sonar:sonar \
+                          -Dsonar.projectKey=OT-Microservices-Employee-Service \
+                          -Dsonar.host.url=http://192.168.1.7:9000 \
+                          -Dsonar.login=$SONAR_TOKEN \
+                          -Dsonar.branch.name=main
+                        '''
+                    }
+                }
+            }
+        }
+
+        // 🔴 ===============================
+        // 🔴 ADDED: Quality Gate
+        // 🔴 ===============================
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        echo "Quality Gate Status: ${qg.status}"
+                        if (qg.status != 'OK') {
+                            error "❌ Pipeline failed due to Quality Gate failure"
+                        }
+                    }
+                }
             }
         }
 
