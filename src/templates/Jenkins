@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'
+        maven 'Maven3'
         jdk 'JDK21'
     }
 
@@ -78,47 +78,22 @@ pipeline {
                 sh '''
                 mkdir -p target/site
 
-                echo "===== CREATE CLEAN HTML ====="
-
-                cat <<EOF > target/site/full-report.html
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <style>
-                        body { font-family: Arial; padding: 20px; }
-                        h1 { color: #2c3e50; }
-                    </style>
-                </head>
-                <body>
-                <h1>Build Report</h1>
+                cat > target/site/full-report.html <<EOF
+                <html><body><h1>Build Report</h1>
                 EOF
 
-                # Append reports safely (avoid broken links)
-                if [ -f target/site/summary.html ]; then
-                    cat target/site/summary.html >> target/site/full-report.html
-                fi
-
-                if [ -f target/site/surefire-report.html ]; then
-                    cat target/site/surefire-report.html >> target/site/full-report.html
-                fi
+                cat target/site/summary.html >> target/site/full-report.html || true
+                cat target/site/surefire-report.html >> target/site/full-report.html || true
+                cat target/site/jacoco/index.html >> target/site/full-report.html || true
 
                 echo "</body></html>" >> target/site/full-report.html
-
-                echo "===== GENERATING PDF (FIXED) ====="
 
                 cd target/site
 
                 wkhtmltopdf \
                 --enable-local-file-access \
-                --disable-smart-shrinking \
-                --load-error-handling ignore \
-                --load-media-error-handling ignore \
                 full-report.html report.pdf || true
-
-                echo "===== VERIFY PDF ====="
-                ls -l
                 '''
-
             }
 
             post {
@@ -168,17 +143,6 @@ ${e2e} E2E Tests
 📄 *PDF Report:* ${pdfLink}
 """
                 )
-
-                // ✅ PDF ATTACHMENT TO SLACK
-                withCredentials([string(credentialsId: 'slack-bot-token', variable: 'SLACK_TOKEN')]) {
-                    sh """
-                    curl -F file=@target/site/report.pdf \
-                         -F "initial_comment=📄 Build Report #${env.BUILD_NUMBER}" \
-                         -F channels=#all-admin \
-                         -H "Authorization: Bearer $SLACK_TOKEN" \
-                         https://slack.com/api/files.upload
-                    """
-                }
             }
         }
     }
