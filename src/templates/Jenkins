@@ -14,18 +14,12 @@ pipeline {
 
     stages {
 
-        // =========================
-        // Checkout
-        // =========================
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // =========================
-        // Build + Test
-        // =========================
         stage('Build & Test') {
             steps {
                 sh 'mvn clean verify'
@@ -37,44 +31,33 @@ pipeline {
             }
         }
 
-        // =========================
-        // SonarQube Analysis (PR + Branch)
-        // =========================
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         script {
 
-                            def sonarCmd = """
-                            mvn sonar:sonar \
-                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_TOKEN}
-                            """
+                            def cmd = "mvn sonar:sonar " +
+                                      "-Dsonar.projectKey=${SONAR_PROJECT_KEY} " +
+                                      "-Dsonar.host.url=${SONAR_HOST_URL} " +
+                                      "-Dsonar.login=$SONAR_TOKEN "
 
-                            // ✅ PR Decoration
                             if (env.CHANGE_ID) {
-                                sonarCmd += """
-                                -Dsonar.pullrequest.key=${env.CHANGE_ID} \
-                                -Dsonar.pullrequest.branch=${env.CHANGE_BRANCH} \
-                                -Dsonar.pullrequest.base=${env.CHANGE_TARGET}
-                                """
-                            } else {
-                                // ✅ Branch Analysis (⚠ requires Developer Edition)
-                                sonarCmd += " -Dsonar.branch.name=${env.BRANCH_NAME}"
+                                cmd += "-Dsonar.pullrequest.key=${env.CHANGE_ID} "
+                                cmd += "-Dsonar.pullrequest.branch=${env.CHANGE_BRANCH} "
+                                cmd += "-Dsonar.pullrequest.base=${env.CHANGE_TARGET} "
+                            } else if (env.BRANCH_NAME && env.BRANCH_NAME != "null") {
+                                // ⚠ Only if NOT Community Edition OR safe value exists
+                                cmd += "-Dsonar.branch.name=${env.BRANCH_NAME} "
                             }
 
-                            sh sonarCmd
+                            sh cmd
                         }
                     }
                 }
             }
         }
 
-        // =========================
-        // Quality Gate
-        // =========================
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -83,18 +66,12 @@ pipeline {
             }
         }
 
-        // =========================
-        // Generate Site
-        // =========================
         stage('Generate Site') {
             steps {
                 sh 'mvn site'
             }
         }
 
-        // =========================
-        // Debug Site Files
-        // =========================
         stage('Debug Site Files') {
             steps {
                 sh '''
@@ -104,21 +81,13 @@ pipeline {
             }
         }
 
-        // =========================
-        // Generate PDF
-        // =========================
         stage('Generate & Archive PDF') {
             steps {
                 sh '''
-                echo "===== GENERATING HTML REPORT ====="
-
                 mkdir -p target/site
 
                 cat > target/site/full-report.html <<EOF
-<html>
-<head><title>Build Report</title></head>
-<body>
-<h1>CI/CD Build Report</h1>
+<html><body><h1>CI/CD Report</h1>
 EOF
 
                 cat target/site/summary.html >> target/site/full-report.html || true
@@ -126,8 +95,6 @@ EOF
                 cat target/site/jacoco/index.html >> target/site/full-report.html || true
 
                 echo "</body></html>" >> target/site/full-report.html
-
-                echo "===== GENERATING PDF ====="
 
                 cd target/site
 
@@ -153,64 +120,36 @@ EOF
         }
     }
 
-    // =========================
-    // POST ACTIONS (FULL)
-    // =========================
     post {
-
-        always {
-            junit '**/target/surefire-reports/*.xml'
-        }
-
         success {
             script {
-
                 def reportUrl = "${env.BUILD_URL}artifact/${PDF_PATH}"
 
-                // ✅ Console link
-                echo "📄 PDF Report:"
-                echo reportUrl
+                echo "📄 PDF LINK: ${reportUrl}"
 
-                // ✅ Slack text message
                 slackSend(
                     channel: '#all-admin',
                     color: 'good',
-                    message: """✅ *Build SUCCESS*
-
-*Job:* ${env.JOB_NAME}
-*Build:* #${env.BUILD_NUMBER}
-
-📄 Report: ${reportUrl}
-"""
+                    message: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}\n📄 ${reportUrl}"
                 )
 
-                // ✅ Slack PDF attachment
                 withCredentials([string(credentialsId: 'slack-bot-token', variable: 'SLACK_TOKEN')]) {
-                    sh """
+                    sh '''
                     curl -X POST https://slack.com/api/files.upload \
                     -H "Authorization: Bearer $SLACK_TOKEN" \
-                    -F file=@${PDF_PATH} \
-                    -F channels=#all-admin \
-                    -F initial_comment="📎 Attached Report - ${JOB_NAME} #${BUILD_NUMBER}"
-                    """
+                    -F file=@target/site/report.pdf \
+                    -F channels=#all-admin
+                    '''
                 }
             }
         }
 
         failure {
-            script {
-                slackSend(
-                    channel: '#all-admin',
-                    color: 'danger',
-                    message: """❌ *Build FAILED*
-
-*Job:* ${env.JOB_NAME}
-*Build:* #${env.BUILD_NUMBER}
-
-🔗 ${env.BUILD_URL}
-"""
-                )
-            }
+            slackSend(
+                channel: '#all-admin',
+                color: 'danger',
+                message: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+            )
         }
     }
 }
