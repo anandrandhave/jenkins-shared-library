@@ -55,46 +55,31 @@ pipeline {
             }
         }
 
-        // ✅ Generate Maven Site (HTML Reports)
+        // 🔥 VERY IMPORTANT (generates reports data)
+        stage('Aggregate Reports') {
+            steps {
+                sh 'mvn verify'
+            }
+        }
+
+        // ✅ Generate Maven Site (HTML reports)
         stage('Generate Site') {
             steps {
                 sh 'mvn clean verify site'
             }
         }
 
-        // ✅ DEBUG 1: Check site folder
+        // ✅ Debug files (helps if PDF empty)
         stage('Debug Site Files') {
             steps {
                 sh '''
-                echo "===== LIST SITE FILES ====="
-                ls -l target/site/ || true
+                echo "===== SITE FILES ====="
+                ls -l target/site/
                 '''
             }
         }
 
-        // ✅ DEBUG 2: Check important files
-        stage('Debug Key Files') {
-            steps {
-                sh '''
-                echo "===== CHECK IMPORTANT FILES ====="
-                ls target/site/index.html || true
-                ls target/site/surefire-report.html || true
-                ls target/site/jacoco/index.html || true
-                '''
-            }
-        }
-
-        // ✅ DEBUG 3: Check wkhtmltopdf
-        stage('Check wkhtmltopdf') {
-            steps {
-                sh '''
-                echo "===== WKHTMLTOPDF VERSION ====="
-                wkhtmltopdf -V || true
-                '''
-            }
-        }
-
-        // ✅ Generate PDF (FINAL FIXED)
+        // ✅ Generate PDF from REAL reports
         stage('Generate PDF') {
             steps {
                 sh '''
@@ -102,14 +87,15 @@ pipeline {
 
                 wkhtmltopdf \
                 --enable-local-file-access \
-                --disable-smart-shrinking \
-                --no-stop-slow-scripts \
                 --load-error-handling ignore \
                 --load-media-error-handling ignore \
-                target/site/index.html target/site/report.pdf
+                target/site/summary.html \
+                target/site/surefire-report.html \
+                target/site/jacoco/index.html \
+                target/site/report.pdf
 
-                echo "===== PDF GENERATED FILES ====="
-                ls -l target/site/report.pdf || true
+                echo "===== PDF GENERATED ====="
+                ls -l target/site/report.pdf
                 '''
             }
         }
@@ -122,9 +108,7 @@ pipeline {
         }
     }
 
-    // ✅ POST SECTION (Slack + Reports)
     post {
-
         always {
             junit '**/target/surefire-reports/*.xml'
         }
@@ -135,17 +119,11 @@ pipeline {
                     channel: '#all-admin',
                     color: 'good',
                     message: """
-✅ Build SUCCESS
-
-Job: ${env.JOB_NAME}
-Branch: ${env.BRANCH_NAME ?: 'N/A'}
+✅ Job: ${env.JOB_NAME}
 Environment: ${env.ENV}
 
-Stages:
-✔ Build
-✔ Unit Tests
-✔ Integration Tests
-✔ E2E Tests
+✔ Build SUCCESS
+✔ Tests PASSED
 ✔ PDF Generated
 
 Build URL: ${env.BUILD_URL}
@@ -161,13 +139,13 @@ Console: ${env.BUILD_URL}console
                     channel: '#all-admin',
                     color: 'danger',
                     message: """
-❌ Build FAILED
-
-Job: ${env.JOB_NAME}
+❌ Job: ${env.JOB_NAME}
 Environment: ${env.ENV}
 
-Check logs:
-${env.BUILD_URL}console
+⚠ Build FAILED
+
+Build URL: ${env.BUILD_URL}
+Console: ${env.BUILD_URL}console
 """
                 )
             }
