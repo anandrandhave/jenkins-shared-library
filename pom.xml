@@ -25,11 +25,11 @@
     </dependency>
   </dependencies>
 
-  <!-- ✅ Build Plugins -->
+  <!-- ✅ Build Plugins (GENERATE DATA) -->
   <build>
     <plugins>
 
-      <!-- Surefire -->
+      <!-- ✅ Surefire (Runs Tests) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -44,7 +44,7 @@
         </configuration>
       </plugin>
 
-      <!-- JaCoCo Execution -->
+      <!-- ✅ JaCoCo (Collect Coverage + Generate Report Data) -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -58,7 +58,7 @@
             </goals>
           </execution>
 
-          <!-- Generate report -->
+          <!-- Generate coverage report -->
           <execution>
             <id>report</id>
             <phase>verify</phase>
@@ -73,18 +73,18 @@
     </plugins>
   </build>
 
-  <!-- ✅ REPORTING SECTION (THIS WAS MISSING / WRONG) -->
+  <!-- ✅ Reporting Plugins (SHOW DATA IN SITE + PDF) -->
   <reporting>
     <plugins>
 
-      <!-- Project Info -->
+      <!-- ✅ Test Report -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>3.4.5</version>
+        <artifactId>maven-surefire-report-plugin</artifactId>
+        <version>3.0.0</version>
       </plugin>
 
-      <!-- JaCoCo REPORT (IMPORTANT) -->
+      <!-- ✅ Coverage Report -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -96,6 +96,13 @@
             </reports>
           </reportSet>
         </reportSets>
+      </plugin>
+
+      <!-- ✅ Project Info -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>3.4.5</version>
       </plugin>
 
     </plugins>
