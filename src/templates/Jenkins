@@ -69,48 +69,66 @@ pipeline {
             }
         }
 
-        // ✅ Debug (optional but useful)
+        // ✅ Debug
         stage('Debug Site Files') {
             steps {
-                sh '''
-                echo "===== SITE FILES ====="
-                ls -l target/site/
-                '''
+                sh 'ls -l target/site/'
             }
         }
 
-        // ✅ Generate + Archive PDF (FINAL FIXED)
+        // ✅ FIXED PDF GENERATION
         stage('Generate & Archive PDF') {
             steps {
                 sh '''
-                echo "===== GENERATING PDF ====="
+                echo "===== GENERATING COMBINED HTML ====="
 
-                wkhtmltopdf \
-                --enable-local-file-access \
-                --load-error-handling ignore \
-                --load-media-error-handling ignore \
-                target/site/summary.html \
-                target/site/surefire-report.html \
-                target/site/jacoco/index.html \
+                cat > target/site/full-report.html <<EOF
+                <html>
+                <head>
+                    <title>Employee Service Report</title>
+                    <style>
+                        body { font-family: Arial; padding: 20px; }
+                        h1 { text-align: center; color: #2c3e50; }
+                        h2 { color: #c0392b; border-bottom: 2px solid #ccc; }
+                        iframe { width: 100%; height: 800px; border: none; }
+                    </style>
+                </head>
+                <body>
+
+                <h1>Employee Service - CI/CD Report</h1>
+
+                <h2>Summary</h2>
+                <iframe src="summary.html"></iframe>
+
+                <h2>Test Report</h2>
+                <iframe src="surefire-report.html"></iframe>
+
+                <h2>Coverage Report</h2>
+                <iframe src="jacoco/index.html"></iframe>
+
+                </body>
+                </html>
+                EOF
+
+                wkhtmltopdf --enable-local-file-access \
+                target/site/full-report.html \
                 target/site/report.pdf
 
-                echo "===== VERIFY PDF ====="
-                ls -l target/site/
+                ls -l target/site/report.pdf
                 '''
 
                 script {
                     if (fileExists('target/site/report.pdf')) {
-                        echo "✅ PDF FOUND - Archiving..."
                         archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
                     } else {
-                        echo "❌ PDF NOT GENERATED"
+                        error "❌ PDF not generated!"
                     }
                 }
             }
         }
     }
 
-    // ✅ POST (REPORT + SLACK)
+    // ✅ POST
     post {
 
         always {
@@ -154,7 +172,13 @@ pipeline {
 *Job:* ${env.JOB_NAME}  
 *Environment:* ${env.ENV}  
 
-⚠ One or more stages failed  
+*Stages Status:*  
+✔ Build  
+✔ Unit Tests  
+✔ Integration Tests  
+✔ E2E Tests  
+✔ Reports Generated  
+❌ PDF Generation Failed  
 
 *Build URL:* ${env.BUILD_URL}  
 *Console:* ${env.BUILD_URL}console  
