@@ -58,7 +58,13 @@ pipeline {
         // ✅ Generate Site (HTML report)
         stage('Generate Site Report') {
             steps {
-                sh 'mvn site'
+                sh 'mvn clean verify site'
+            }
+        }
+
+        stage('Debug Site') {
+            steps {
+                sh 'ls -l target/site/'
             }
         }
 
@@ -68,8 +74,6 @@ pipeline {
                 sh '''
                 wkhtmltopdf \
                 --enable-local-file-access \
-                --no-stop-slow-scripts \
-                --disable-smart-shrinking \
                 target/site/index.html target/site/report.pdf
                 '''
             }
