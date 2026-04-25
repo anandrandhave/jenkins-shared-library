@@ -49,29 +49,41 @@ pipeline {
                 }
             }
         }
+
+        // ✅ ADD THIS STAGE (PDF + Coverage)
+        stage('Generate Reports') {
+            steps {
+                sh 'mvn site pdf:pdf'
+            }
+        }
+
+        // ✅ ADD THIS (Artifacts)
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts artifacts: 'target/pdf/*.pdf, target/site/jacoco/**', fingerprint: true
+            }
+        }
     }
 
-    // ✅ FIXED SLACK NOTIFICATIONS
+    // ✅ ADD THIS (Test Results + Slack)
     post {
+
+        always {
+            junit '**/target/surefire-reports/*.xml'
+        }
 
         success {
             slackSend(
                 channel: '#all-admin',
+                teamDomain: 'admin-ngv1996',              // ✅ MUST MATCH
+                tokenCredentialId: 'my-slack-token-id',  // ✅ MUST MATCH
                 message: """
-✅ *Build ${env.BUILD_NUMBER} SUCCESS*
+✅ Build SUCCESS
 
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
+Job: ${env.JOB_NAME}
+Build: ${env.BUILD_NUMBER}
 
-🧪 Stages:
-✔ Build
-✔ Unit Tests
-✔ Integration Tests
-✔ E2E Tests
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
+🔗 ${env.BUILD_URL}
 """
             )
         }
@@ -79,36 +91,15 @@ pipeline {
         failure {
             slackSend(
                 channel: '#all-admin',
+                teamDomain: 'admin-ngv1996',
+                tokenCredentialId: 'my-slack-token-id',
                 message: """
-❌ *Build ${env.BUILD_NUMBER} FAILED*
+❌ Build FAILED
 
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
+Job: ${env.JOB_NAME}
+Build: ${env.BUILD_NUMBER}
 
-🧪 Failed Stages:
-⚠ Check Jenkins Stage View for exact failure
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
-"""
-            )
-        }
-
-        unstable {
-            slackSend(
-                channel: '#all-admin',
-                message: """
-⚠ *Build ${env.BUILD_NUMBER} UNSTABLE*
-
-📦 Job: ${env.JOB_NAME}
-🌿 Branch: ${env.BRANCH_NAME ?: 'N/A'}
-🌍 Environment: dev
-
-🧪 Some tests failed (but pipeline continued)
-
-🔗 Build URL: ${env.BUILD_URL}
-📄 Console: ${env.BUILD_URL}console
+🔗 ${env.BUILD_URL}
 """
             )
         }
