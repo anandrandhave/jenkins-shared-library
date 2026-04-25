@@ -1,104 +1,100 @@
 pipeline {
-
     agent any
 
     tools {
-        maven 'Maven3'
+        maven 'Maven'
         jdk 'JDK21'
     }
 
     environment {
-        JOB_NAME = "OT-Microservices-Employee-Service"
-        ENV = "dev"
+        SONAR_PROJECT_KEY = 'OT-Microservices-Employee-Service'
+        SONAR_HOST_URL   = 'http://192.168.1.7:9000'
+        PDF_PATH         = 'target/site/report.pdf'
     }
 
     stages {
 
+        // =========================
+        // Checkout
+        // =========================
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build') {
+        // =========================
+        // Build + Test
+        // =========================
+        stage('Build & Test') {
             steps {
-                sh 'mvn clean compile'
+                sh 'mvn clean verify'
             }
-        }
-
-        stage('Parallel Tests') {
-            parallel {
-
-                stage('Unit Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=*UnitTest test'
-                        }
-                    }
-                }
-
-                stage('Integration Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=*IntegrationTest test'
-                        }
-                    }
-                }
-
-                stage('E2E Tests') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            sh 'mvn -Dtest=*E2ETest test'
-                        }
-                    }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
                 }
             }
         }
 
-        stage('Aggregate Reports') {
-            steps {
-                sh 'mvn verify'
-            }
-        }
-
-        // ✅ SONAR ANALYSIS
+        // =========================
+        // SonarQube Analysis (PR + Branch)
+        // =========================
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                        mvn sonar:sonar \
-                          -Dsonar.projectKey=OT-Microservices-Employee-Service \
-                          -Dsonar.host.url=http://192.168.1.7:9000 \
-                          -Dsonar.login=$SONAR_TOKEN \
-         
-                        '''
-                    }
-                }
-            }
-        }
+                        script {
 
-        // ✅ QUALITY GATE
-        stage('Quality Gate') {
-            steps {
-                script {
-                    timeout(time: 5, unit: 'MINUTES') {
-                        def qg = waitForQualityGate()
-                        echo "Quality Gate Status: ${qg.status}"
-                        if (qg.status != 'OK') {
-                            error "❌ Pipeline failed due to Quality Gate failure"
+                            def sonarCmd = """
+                            mvn sonar:sonar \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
+                            -Dsonar.login=${SONAR_TOKEN}
+                            """
+
+                            // ✅ PR Decoration
+                            if (env.CHANGE_ID) {
+                                sonarCmd += """
+                                -Dsonar.pullrequest.key=${env.CHANGE_ID} \
+                                -Dsonar.pullrequest.branch=${env.CHANGE_BRANCH} \
+                                -Dsonar.pullrequest.base=${env.CHANGE_TARGET}
+                                """
+                            } else {
+                                // ✅ Branch Analysis (⚠ requires Developer Edition)
+                                sonarCmd += " -Dsonar.branch.name=${env.BRANCH_NAME}"
+                            }
+
+                            sh sonarCmd
                         }
                     }
                 }
             }
         }
 
+        // =========================
+        // Quality Gate
+        // =========================
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        // =========================
+        // Generate Site
+        // =========================
         stage('Generate Site') {
             steps {
                 sh 'mvn site'
             }
         }
 
+        // =========================
+        // Debug Site Files
+        // =========================
         stage('Debug Site Files') {
             steps {
                 sh '''
@@ -108,41 +104,28 @@ pipeline {
             }
         }
 
-        stage('Generate & Archive Branded PDF') {
+        // =========================
+        // Generate PDF
+        // =========================
+        stage('Generate & Archive PDF') {
             steps {
                 sh '''
-                echo "===== GENERATING BRANDED HTML ====="
+                echo "===== GENERATING HTML REPORT ====="
 
                 mkdir -p target/site
 
                 cat > target/site/full-report.html <<EOF
 <html>
+<head><title>Build Report</title></head>
 <body>
-
-<h2>Summary</h2>
+<h1>CI/CD Build Report</h1>
 EOF
 
-                cat target/site/summary.html >> target/site/full-report.html
+                cat target/site/summary.html >> target/site/full-report.html || true
+                cat target/site/surefire-report.html >> target/site/full-report.html || true
+                cat target/site/jacoco/index.html >> target/site/full-report.html || true
 
-                cat >> target/site/full-report.html <<EOF
-
-<h2>Test Results</h2>
-EOF
-
-                cat target/site/surefire-report.html >> target/site/full-report.html
-
-                cat >> target/site/full-report.html <<EOF
-
-<h2>Code Coverage</h2>
-EOF
-
-                cat target/site/jacoco/index.html >> target/site/full-report.html
-
-                cat >> target/site/full-report.html <<EOF
-
-</body>
-</html>
-EOF
+                echo "</body></html>" >> target/site/full-report.html
 
                 echo "===== GENERATING PDF ====="
 
@@ -159,22 +142,20 @@ EOF
                 --load-error-handling ignore \
                 --load-media-error-handling ignore \
                 full-report.html report.pdf
-
-                ls -l report.pdf
                 '''
+            }
 
-                script {
-                    if (fileExists('target/site/report.pdf')) {
-                        echo "✅ PDF GENERATED"
-                        archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
-                    } else {
-                        error "❌ PDF not generated!"
-                    }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
                 }
             }
         }
     }
 
+    // =========================
+    // POST ACTIONS (FULL)
+    // =========================
     post {
 
         always {
@@ -183,23 +164,36 @@ EOF
 
         success {
             script {
+
+                def reportUrl = "${env.BUILD_URL}artifact/${PDF_PATH}"
+
+                // ✅ Console link
+                echo "📄 PDF Report:"
+                echo reportUrl
+
+                // ✅ Slack text message
                 slackSend(
                     channel: '#all-admin',
                     color: 'good',
-                    message: """
-✅ *Build SUCCESS*
+                    message: """✅ *Build SUCCESS*
 
 *Job:* ${env.JOB_NAME}
-*Environment:* ${env.ENV}
+*Build:* #${env.BUILD_NUMBER}
 
-✔ Build
-✔ Tests
-✔ Reports
-✔ PDF
-
-*Build URL:* ${env.BUILD_URL}
+📄 Report: ${reportUrl}
 """
                 )
+
+                // ✅ Slack PDF attachment
+                withCredentials([string(credentialsId: 'slack-bot-token', variable: 'SLACK_TOKEN')]) {
+                    sh """
+                    curl -X POST https://slack.com/api/files.upload \
+                    -H "Authorization: Bearer $SLACK_TOKEN" \
+                    -F file=@${PDF_PATH} \
+                    -F channels=#all-admin \
+                    -F initial_comment="📎 Attached Report - ${JOB_NAME} #${BUILD_NUMBER}"
+                    """
+                }
             }
         }
 
@@ -208,12 +202,12 @@ EOF
                 slackSend(
                     channel: '#all-admin',
                     color: 'danger',
-                    message: """
-❌ *Build FAILED*
+                    message: """❌ *Build FAILED*
 
 *Job:* ${env.JOB_NAME}
+*Build:* #${env.BUILD_NUMBER}
 
-*Build URL:* ${env.BUILD_URL}
+🔗 ${env.BUILD_URL}
 """
                 )
             }
