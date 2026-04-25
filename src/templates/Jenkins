@@ -92,7 +92,9 @@ pipeline {
 
                 wkhtmltopdf \
                 --enable-local-file-access \
-                full-report.html report.pdf || true
+                full-report.html report.pdf
+
+                ls -l report.pdf
                 '''
             }
 
@@ -121,9 +123,11 @@ pipeline {
                 }
 
                 def pdfLink = "${env.BUILD_URL}artifact/target/site/report.pdf"
+                def pdfPath = "target/site/report.pdf"
 
                 echo "📄 PDF LINK: ${pdfLink}"
 
+                // ✅ Slack summary message
                 slackSend(
                     channel: '#all-admin',
                     color: (buildStatus == 'SUCCESS') ? 'good' : 'danger',
@@ -140,9 +144,27 @@ ${integ} Integration Tests
 ${e2e} E2E Tests
 :heavy_check_mark: Reports Generated
 
-📄 *PDF Report:* ${pdfLink}
+📄 *PDF Link:* ${pdfLink}
 """
                 )
+
+                // ✅ Upload PDF directly to Slack
+                if (fileExists(pdfPath)) {
+
+                    slackUploadFile(
+                        channel: "#all-admin",
+                        filePath: pdfPath,
+                        initialComment: "📄 Build Report for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                    )
+
+                } else {
+
+                    slackSend(
+                        channel: '#all-admin',
+                        color: 'danger',
+                        message: "❌ PDF not found. Report generation failed."
+                    )
+                }
             }
         }
     }
