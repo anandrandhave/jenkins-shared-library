@@ -13,12 +13,14 @@ pipeline {
 
     stages {
 
+        // ✅ Checkout
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // ✅ Build
         stage('Build') {
             steps {
                 sh 'mvn clean compile'
@@ -55,70 +57,81 @@ pipeline {
             }
         }
 
-        // ✅ Aggregate reports
+        // ✅ Aggregate Reports
         stage('Aggregate Reports') {
             steps {
                 sh 'mvn verify'
             }
         }
 
-        // ✅ Generate HTML reports
+        // ✅ Generate Maven Site (HTML reports)
         stage('Generate Site') {
             steps {
                 sh 'mvn site'
             }
         }
 
-        // ✅ Debug
+        // ✅ Debug Site Files (VERY IMPORTANT)
         stage('Debug Site Files') {
             steps {
-                sh 'ls -l target/site/'
+                sh '''
+                echo "===== SITE FILES ====="
+                ls -l target/site/
+                '''
             }
         }
 
-        // ✅ FIXED PDF GENERATION
+        // ✅ FINAL FIXED PDF GENERATION
         stage('Generate & Archive PDF') {
             steps {
                 sh '''
                 echo "===== GENERATING COMBINED HTML ====="
 
                 cat > target/site/full-report.html <<EOF
-                <html>
-                <head>
-                    <title>Employee Service Report</title>
-                    <style>
-                        body { font-family: Arial; padding: 20px; }
-                        h1 { text-align: center; color: #2c3e50; }
-                        h2 { color: #c0392b; border-bottom: 2px solid #ccc; }
-                        iframe { width: 100%; height: 800px; border: none; }
-                    </style>
-                </head>
-                <body>
+<html>
+<head>
+    <title>Employee Service Report</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        h1 { color: #2c3e50; }
+        h2 { color: #c0392b; border-bottom: 2px solid #ccc; }
+        iframe { width: 100%; height: 800px; border: none; }
+    </style>
+</head>
+<body>
 
-                <h1>Employee Service - CI/CD Report</h1>
+<h1>Employee Service - CI/CD Report</h1>
 
-                <h2>Summary</h2>
-                <iframe src="summary.html"></iframe>
+<h2>Summary</h2>
+<iframe src="summary.html"></iframe>
 
-                <h2>Test Report</h2>
-                <iframe src="surefire-report.html"></iframe>
+<h2>Test Report</h2>
+<iframe src="surefire-report.html"></iframe>
 
-                <h2>Coverage Report</h2>
-                <iframe src="jacoco/index.html"></iframe>
+<h2>Coverage Report</h2>
+<iframe src="jacoco/index.html"></iframe>
 
-                </body>
-                </html>
-                EOF
+</body>
+</html>
+EOF
 
-                wkhtmltopdf --enable-local-file-access \
-                target/site/full-report.html \
-                target/site/report.pdf
+                echo "===== MOVE INTO SITE DIRECTORY ====="
+                cd target/site
 
-                ls -l target/site/report.pdf
+                echo "===== GENERATING PDF ====="
+
+                wkhtmltopdf \
+                --enable-local-file-access \
+                full-report.html \
+                report.pdf
+
+                echo "===== VERIFY PDF ====="
+                ls -l report.pdf
                 '''
 
                 script {
                     if (fileExists('target/site/report.pdf')) {
+                        echo "✅ PDF FOUND - Archiving..."
                         archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
                     } else {
                         error "❌ PDF not generated!"
@@ -128,13 +141,15 @@ pipeline {
         }
     }
 
-    // ✅ POST
+    // ✅ POST ACTIONS
     post {
 
+        // Always publish test results
         always {
             junit '**/target/surefire-reports/*.xml'
         }
 
+        // ✅ SUCCESS SLACK
         success {
             script {
                 slackSend(
@@ -161,6 +176,7 @@ pipeline {
             }
         }
 
+        // ❌ FAILURE SLACK
         failure {
             script {
                 slackSend(
@@ -172,13 +188,7 @@ pipeline {
 *Job:* ${env.JOB_NAME}  
 *Environment:* ${env.ENV}  
 
-*Stages Status:*  
-✔ Build  
-✔ Unit Tests  
-✔ Integration Tests  
-✔ E2E Tests  
-✔ Reports Generated  
-❌ PDF Generation Failed  
+⚠ One or more stages failed  
 
 *Build URL:* ${env.BUILD_URL}  
 *Console:* ${env.BUILD_URL}console  
