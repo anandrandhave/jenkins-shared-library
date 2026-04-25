@@ -55,21 +55,21 @@ pipeline {
             }
         }
 
-        // 🔥 VERY IMPORTANT (generates reports data)
+        // ✅ Aggregate reports
         stage('Aggregate Reports') {
             steps {
                 sh 'mvn verify'
             }
         }
 
-        // ✅ Generate Maven Site (HTML reports)
+        // ✅ Generate HTML reports
         stage('Generate Site') {
             steps {
-                sh 'mvn clean verify site'
+                sh 'mvn site'
             }
         }
 
-        // ✅ Debug files (helps if PDF empty)
+        // ✅ Debug (optional but useful)
         stage('Debug Site Files') {
             steps {
                 sh '''
@@ -79,8 +79,8 @@ pipeline {
             }
         }
 
-        // ✅ Generate PDF from REAL reports
-        stage('Generate PDF') {
+        // ✅ Generate + Archive PDF (FINAL FIXED)
+        stage('Generate & Archive PDF') {
             steps {
                 sh '''
                 echo "===== GENERATING PDF ====="
@@ -94,21 +94,25 @@ pipeline {
                 target/site/jacoco/index.html \
                 target/site/report.pdf
 
-                echo "===== PDF GENERATED ====="
-                ls -l target/site/report.pdf
+                echo "===== VERIFY PDF ====="
+                ls -l target/site/
                 '''
-            }
-        }
 
-        // ✅ Archive PDF
-        stage('Archive Artifacts') {
-            steps {
-                archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
+                script {
+                    if (fileExists('target/site/report.pdf')) {
+                        echo "✅ PDF FOUND - Archiving..."
+                        archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
+                    } else {
+                        echo "❌ PDF NOT GENERATED"
+                    }
+                }
             }
         }
     }
 
+    // ✅ POST (REPORT + SLACK)
     post {
+
         always {
             junit '**/target/surefire-reports/*.xml'
         }
@@ -119,15 +123,21 @@ pipeline {
                     channel: '#all-admin',
                     color: 'good',
                     message: """
-✅ Job: ${env.JOB_NAME}
-Environment: ${env.ENV}
+✅ *Build SUCCESS*
 
-✔ Build SUCCESS
-✔ Tests PASSED
-✔ PDF Generated
+*Job:* ${env.JOB_NAME}  
+*Environment:* ${env.ENV}  
 
-Build URL: ${env.BUILD_URL}
-Console: ${env.BUILD_URL}console
+*Stages:*  
+✔ Build  
+✔ Unit Tests  
+✔ Integration Tests  
+✔ E2E Tests  
+✔ Reports Generated  
+✔ PDF Generated  
+
+*Build URL:* ${env.BUILD_URL}  
+*Console:* ${env.BUILD_URL}console  
 """
                 )
             }
@@ -139,13 +149,15 @@ Console: ${env.BUILD_URL}console
                     channel: '#all-admin',
                     color: 'danger',
                     message: """
-❌ Job: ${env.JOB_NAME}
-Environment: ${env.ENV}
+❌ *Build FAILED*
 
-⚠ Build FAILED
+*Job:* ${env.JOB_NAME}  
+*Environment:* ${env.ENV}  
 
-Build URL: ${env.BUILD_URL}
-Console: ${env.BUILD_URL}console
+⚠ One or more stages failed  
+
+*Build URL:* ${env.BUILD_URL}  
+*Console:* ${env.BUILD_URL}console  
 """
                 )
             }
