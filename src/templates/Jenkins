@@ -69,7 +69,7 @@ pipeline {
 
         stage('Generate Site') {
             steps {
-                sh 'mvn site'
+                sh 'mvn clean verify site'
             }
         }
 
@@ -77,38 +77,29 @@ pipeline {
    stage('Generate & Archive PDF') {
     steps {
         sh '''
-        set -e
-
         echo "===== START PDF STAGE ====="
 
         mkdir -p target/site
 
-        echo "===== CHECK HTML ====="
-        ls -l target/site || true
+        echo "===== VERIFY HTML FILE ====="
+        ls -l target/site
 
-        # Ensure index.html exists
         if [ ! -f target/site/index.html ]; then
-            echo "<html><body><h1>Report</h1><p>No Maven site found</p></body></html>" > target/site/index.html
+          echo "ERROR: index.html not found!"
+          exit 1
         fi
 
-        echo "===== INSTALL wkhtmltopdf ====="
-        if ! command -v wkhtmltopdf > /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y wkhtmltopdf
-        fi
+        echo "===== GENERATING PDF ====="
+        wkhtmltopdf --enable-local-file-access --load-error-handling ignore target/site/index.html target/site/report.pdf || true
 
-        echo "===== GENERATE PDF ====="
-        wkhtmltopdf target/site/index.html target/site/report.pdf
-
-        echo "===== VERIFY PDF ====="
-        ls -l target/site/
-
-        if [ ! -f target/site/report.pdf ]; then
-            echo "❌ PDF generation failed"
+        echo "===== VERIFY PDF CREATED ====="
+        if [ -f target/site/report.pdf ]; then
+            echo "✅ PDF created successfully"
+            ls -l target/site/report.pdf
+        else
+            echo "❌ PDF NOT created"
             exit 1
         fi
-
-        echo "✅ PDF GENERATED SUCCESSFULLY"
         '''
     }
 
