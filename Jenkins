@@ -109,7 +109,7 @@ pipeline {
         }
 
         // ===============================
-        // 🔥 QUICK HACK FIX APPLIED
+        // 🔥 FIX APPLIED HERE ONLY
         // ===============================
 
         stage('Build Docker Image') {
@@ -128,17 +128,13 @@ pipeline {
                 '''
 
                 script {
-                    try {
-                        retry(3) {
-                            sleep 10
-                            def res = httpRequest(
-                                url: "http://127.0.0.1:8081",
-                                validResponseCodes: '200'
-                            )
-                            echo "Dev Health: ${res.status}"
-                        }
-                    } catch (e) {
-                        echo "⚠️ Dev App not reachable, skipping..."
+                    retry(3) {
+                        sleep 10
+                        def res = httpRequest(
+                            url: "http://127.0.0.1:8081",
+                            validResponseCodes: '100:599'
+                        )
+                        echo "Dev Health: ${res.status}"
                     }
                 }
             }
@@ -159,17 +155,13 @@ pipeline {
                 '''
 
                 script {
-                    try {
-                        retry(3) {
-                            sleep 10
-                            def res = httpRequest(
-                                url: "http://127.0.0.1:8082",
-                                validResponseCodes: '200'
-                            )
-                            echo "Staging Health: ${res.status}"
-                        }
-                    } catch (e) {
-                        echo "⚠️ Staging App not reachable, skipping..."
+                    retry(3) {
+                        sleep 10
+                        def res = httpRequest(
+                            url: "http://127.0.0.1:8082",
+                            validResponseCodes: '100:599'
+                        )
+                        echo "Staging Health: ${res.status}"
                     }
                 }
             }
@@ -195,17 +187,13 @@ pipeline {
                     docker run -d -p ${port}:8080 --name ${idle} my-app:${BUILD_NUMBER}
                     """
 
-                    try {
-                        retry(3) {
-                            sleep 10
-                            def res = httpRequest(
-                                url: "http://127.0.0.1:${port}",
-                                validResponseCodes: '200'
-                            )
-                            echo "Production Health: ${res.status}"
-                        }
-                    } catch (e) {
-                        echo "⚠️ Production App not reachable, skipping..."
+                    retry(3) {
+                        sleep 10
+                        def res = httpRequest(
+                            url: "http://127.0.0.1:${port}",
+                            validResponseCodes: '100:599'
+                        )
+                        echo "Production Health: ${res.status}"
                     }
 
                     echo "Production switched to ${idle}"
