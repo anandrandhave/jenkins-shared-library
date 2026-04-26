@@ -118,7 +118,7 @@ pipeline {
         }
 
         // ===============================
-        // ✅ DEPLOYMENT STAGES (SKIPPED)
+        // ✅ DEPLOYMENT STAGES (CONTROLLED)
         // ===============================
 
         stage('Deploy to Dev') {
@@ -127,11 +127,11 @@ pipeline {
             }
             steps {
                 milestone(1)
-
                 sh '''
                 docker rm -f dev || true
-                docker run -d -p 8081:8080 --name dev my-app:${BUILD_NUMBER}
+                docker run -d --name dev my-app:${BUILD_NUMBER}
                 '''
+                echo "✅ Container started (No health check needed)"
             }
         }
 
@@ -152,7 +152,7 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f staging || true
-                docker run -d -p 8082:8080 --name staging my-app:${BUILD_NUMBER}
+                docker run -d --name staging my-app:${BUILD_NUMBER}
                 '''
             }
         }
@@ -163,7 +163,6 @@ pipeline {
             }
             steps {
                 milestone(3)
-
                 script {
                     echo "Skipping Production Deployment (Demo Mode)"
                 }
