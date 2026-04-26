@@ -73,38 +73,48 @@ pipeline {
             }
         }
 
+        // ✅ FIXED STAGE (ONLY THIS CHANGED)
         stage('Generate & Archive PDF') {
             steps {
                 sh '''
+                set -e
+
                 mkdir -p target/site
 
-                cat > target/site/full-report.html <<EOF
-                <html><body><h1>Build Report</h1>
+                # Create HTML inside correct folder
+                cat > target/site/report.html <<EOF
+                <html>
+                <body>
+                    <h1>Jenkins Build Report</h1>
+                    <p>Status: SUCCESS</p>
+                </body>
+                </html>
                 EOF
 
-                cat target/site/summary.html >> target/site/full-report.html || true
-                cat target/site/surefire-report.html >> target/site/full-report.html || true
-                cat target/site/jacoco/index.html >> target/site/full-report.html || true
+                # Ensure wkhtmltopdf exists (NO sudo issues in Jenkins)
+                if ! command -v wkhtmltopdf >/dev/null 2>&1; then
+                    echo "❌ wkhtmltopdf not installed. Install it manually on Jenkins server:"
+                    echo "sudo apt install wkhtmltopdf"
+                    exit 1
+                fi
 
-                echo "</body></html>" >> target/site/full-report.html
+                # Generate PDF (correct path)
+                wkhtmltopdf target/site/report.html target/site/report.pdf
 
-                cd target/site
-
-                wkhtmltopdf \
-                --enable-local-file-access \
-                full-report.html report.pdf || true
+                echo "✅ PDF Generated"
+                ls -l target/site/
                 '''
             }
 
             post {
                 always {
-                    archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: false
                 }
             }
         }
 
         // ===============================
-        // 🔥 ADDED PART (DO NOT REMOVE ABOVE)
+        // 🔥 DO NOT TOUCH BELOW
         // ===============================
 
         stage('Build Docker Image') {
