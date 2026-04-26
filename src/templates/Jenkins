@@ -74,15 +74,17 @@ pipeline {
         }
 
         // ✅ FIXED STAGE (ONLY THIS CHANGED)
-      stage('Generate & Archive PDF') {
+   stage('Generate & Archive PDF') {
     steps {
         sh '''
-        echo "===== PDF GENERATION START ====="
+        set -e
 
-        # Always create directory
+        echo "===== START PDF STAGE ====="
+
+        # Ensure directory exists
         mkdir -p target/site
 
-        # Create HTML INSIDE target/site (IMPORTANT FIX)
+        # Create HTML in correct location
         cat > target/site/report.html <<EOF
         <html>
         <body>
@@ -92,19 +94,20 @@ pipeline {
         </html>
         EOF
 
-        # Install wkhtmltopdf if not present (safe install)
-        if ! command -v wkhtmltopdf > /dev/null 2>&1
-        then
-            echo "Installing wkhtmltopdf..."
-            sudo apt-get update -y || true
-            sudo apt-get install -y wkhtmltopdf || true
+        echo "HTML created:"
+        ls -l target/site/report.html
+
+        # Check wkhtmltopdf
+        if ! command -v wkhtmltopdf >/dev/null 2>&1; then
+            echo "ERROR: wkhtmltopdf not installed"
+            exit 1
         fi
 
-        # Generate PDF (NO silent fail)
-        wkhtmltopdf target/site/report.html target/site/report.pdf || echo "PDF generation failed"
+        # Generate PDF (STRICT → must succeed)
+        wkhtmltopdf target/site/report.html target/site/report.pdf
 
-        echo "===== FILES IN target/site ====="
-        ls -l target/site || true
+        echo "PDF created:"
+        ls -l target/site/report.pdf
         '''
     }
 
