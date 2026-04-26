@@ -1,35 +1,57 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- ✅ REQUIRED: Spring Boot Parent -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.2.5</version>
+    <relativePath/>
+  </parent>
+
   <groupId>com.devops</groupId>
   <artifactId>jenkins-shared-library</artifactId>
   <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
 
+  <!-- ✅ Properties -->
   <properties>
-    <maven.compiler.source>8</maven.compiler.source>
-    <maven.compiler.target>8</maven.compiler.target>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>17</java.version>
   </properties>
 
   <!-- ✅ Dependencies -->
   <dependencies>
+
+    <!-- 🔥 Spring Boot Web (CREATES RUNNING APP) -->
     <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <version>5.10.0</version>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- ✅ Test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
   </dependencies>
 
-  <!-- ✅ Build Plugins (GENERATE DATA) -->
+  <!-- ✅ Build Plugins -->
   <build>
     <plugins>
 
-      <!-- ✅ Surefire (Runs Tests) -->
+      <!-- ✅ REQUIRED: Makes executable JAR -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- ✅ Test execution -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -44,21 +66,19 @@
         </configuration>
       </plugin>
 
-      <!-- ✅ JaCoCo (Collect Coverage + Generate Report Data) -->
+      <!-- ✅ Coverage -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>0.8.11</version>
         <executions>
 
-          <!-- Attach agent -->
           <execution>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
           </execution>
 
-          <!-- Generate coverage report -->
           <execution>
             <id>report</id>
             <phase>verify</phase>
@@ -72,40 +92,5 @@
 
     </plugins>
   </build>
-
-  <!-- ✅ Reporting Plugins (SHOW DATA IN SITE + PDF) -->
-  <reporting>
-    <plugins>
-
-      <!-- ✅ Test Report -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-report-plugin</artifactId>
-        <version>3.0.0</version>
-      </plugin>
-
-      <!-- ✅ Coverage Report -->
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.11</version>
-        <reportSets>
-          <reportSet>
-            <reports>
-              <report>report</report>
-            </reports>
-          </reportSet>
-        </reportSets>
-      </plugin>
-
-      <!-- ✅ Project Info -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>3.4.5</version>
-      </plugin>
-
-    </plugins>
-  </reporting>
 
 </project>
