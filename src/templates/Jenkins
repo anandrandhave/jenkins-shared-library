@@ -47,7 +47,6 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-
                         sh '''
                         mvn sonar:sonar \
                         -Dsonar.projectKey=$SONAR_PROJECT_KEY \
@@ -73,45 +72,44 @@ pipeline {
             }
         }
 
-        // ✅ FIXED STAGE (ONLY THIS CHANGED)
-   stage('Generate & Archive PDF') {
-    steps {
-        sh '''
-        echo "===== START PDF STAGE ====="
+        stage('Generate & Archive PDF') {
+            steps {
+                sh '''
+                echo "===== START PDF STAGE ====="
 
-        mkdir -p target/site
+                mkdir -p target/site
 
-        echo "===== VERIFY HTML FILE ====="
-        ls -l target/site
+                echo "===== VERIFY HTML FILE ====="
+                ls -l target/site
 
-        if [ ! -f target/site/index.html ]; then
-          echo "ERROR: index.html not found!"
-          exit 1
-        fi
+                if [ ! -f target/site/index.html ]; then
+                  echo "ERROR: index.html not found!"
+                  exit 1
+                fi
 
-        echo "===== GENERATING PDF ====="
-        wkhtmltopdf --enable-local-file-access --load-error-handling ignore target/site/index.html target/site/report.pdf || true
+                echo "===== GENERATING PDF ====="
+                wkhtmltopdf --enable-local-file-access --load-error-handling ignore target/site/index.html target/site/report.pdf || true
 
-        echo "===== VERIFY PDF CREATED ====="
-        if [ -f target/site/report.pdf ]; then
-            echo "✅ PDF created successfully"
-            ls -l target/site/report.pdf
-        else
-            echo "❌ PDF NOT created"
-            exit 1
-        fi
-        '''
-    }
+                echo "===== VERIFY PDF CREATED ====="
+                if [ -f target/site/report.pdf ]; then
+                    echo "✅ PDF created successfully"
+                    ls -l target/site/report.pdf
+                else
+                    echo "❌ PDF NOT created"
+                    exit 1
+                fi
+                '''
+            }
 
-    post {
-        always {
-            archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
+            post {
+                always {
+                    archiveArtifacts artifacts: 'target/site/report.pdf', fingerprint: true
+                }
+            }
         }
-    }
-}
 
         // ===============================
-        // 🔥 DO NOT TOUCH BELOW
+        // 🔥 FIXED BELOW
         // ===============================
 
         stage('Build Docker Image') {
@@ -130,10 +128,13 @@ pipeline {
                 '''
 
                 script {
-                    sleep 5
-                    def res = httpRequest url: "http://127.0.0.1:8081/health"
-                    if (res.status != 200) {
-                        error "Dev deployment failed"
+                    retry(3) {
+                        sleep 10
+                        def res = httpRequest(
+                            url: "http://127.0.0.1:8081/actuator/health",
+                            validResponseCodes: '200'
+                        )
+                        echo "Dev Health: ${res.status}"
                     }
                 }
             }
@@ -154,10 +155,13 @@ pipeline {
                 '''
 
                 script {
-                    sleep 5
-                    def res = httpRequest url: "http://127.0.0.1:8082/health"
-                    if (res.status != 200) {
-                        error "Staging deployment failed"
+                    retry(3) {
+                        sleep 10
+                        def res = httpRequest(
+                            url: "http://127.0.0.1:8082/actuator/health",
+                            validResponseCodes: '200'
+                        )
+                        echo "Staging Health: ${res.status}"
                     }
                 }
             }
@@ -175,7 +179,6 @@ pipeline {
 
                     def idle = (active == "blue") ? "green" : "blue"
                     def port = (idle == "green") ? "8084" : "8083"
-                    def url = "http://127.0.0.1:${port}/health"
 
                     echo "Deploying to ${idle}"
 
@@ -184,16 +187,16 @@ pipeline {
                     docker run -d -p ${port}:8080 --name ${idle} my-app:${BUILD_NUMBER}
                     """
 
-                    sleep 5
-
-                    def res = httpRequest url: url
-
-                    if (res.status == 200) {
-                        echo "Production switched to ${idle}"
-                    } else {
-                        sh "docker rm -f ${idle}"
-                        error "Production deployment failed → rollback triggered"
+                    retry(3) {
+                        sleep 10
+                        def res = httpRequest(
+                            url: "http://127.0.0.1:${port}/actuator/health",
+                            validResponseCodes: '200'
+                        )
+                        echo "Production Health: ${res.status}"
                     }
+
+                    echo "Production switched to ${idle}"
                 }
             }
         }
