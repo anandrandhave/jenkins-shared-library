@@ -9,6 +9,9 @@ pipeline {
     environment {
         SONAR_PROJECT_KEY = 'OT-Microservices-Employee-Service'
         SONAR_HOST_URL   = 'http://192.168.1.7:9000'
+
+        // ✅ FLAG TO SKIP DEPLOYMENT
+        SKIP_DEPLOY = 'true'
     }
 
     stages {
@@ -114,8 +117,14 @@ pipeline {
             }
         }
 
-        // ✅ FIXED DEV
+        // ===============================
+        // ✅ DEPLOYMENT STAGES (SKIPPED)
+        // ===============================
+
         stage('Deploy to Dev') {
+            when {
+                expression { env.SKIP_DEPLOY != 'true' }
+            }
             steps {
                 milestone(1)
 
@@ -123,84 +132,40 @@ pipeline {
                 docker rm -f dev || true
                 docker run -d -p 8081:8080 --name dev my-app:${BUILD_NUMBER}
                 '''
-
-                script {
-                    echo "Checking app (safe mode)..."
-                    sh '''
-                    for i in 1 2 3
-                    do
-                      sleep 10
-                      curl -s http://127.0.0.1:8081 && exit 0
-                    done
-                    echo "App not reachable, skipping..."
-                    exit 0
-                    '''
-                }
             }
         }
 
         stage('Approval for Staging') {
+            when {
+                expression { env.SKIP_DEPLOY != 'true' }
+            }
             steps {
                 milestone(2)
                 input message: "Deploy to Staging?"
             }
         }
 
-        // ✅ FIXED STAGING
         stage('Deploy to Staging') {
+            when {
+                expression { env.SKIP_DEPLOY != 'true' }
+            }
             steps {
                 sh '''
                 docker rm -f staging || true
                 docker run -d -p 8082:8080 --name staging my-app:${BUILD_NUMBER}
                 '''
-
-                script {
-                    echo "Checking staging app..."
-                    sh '''
-                    for i in 1 2 3
-                    do
-                      sleep 10
-                      curl -s http://127.0.0.1:8082 && exit 0
-                    done
-                    echo "Staging not reachable, skipping..."
-                    exit 0
-                    '''
-                }
             }
         }
 
-        // ✅ FIXED PRODUCTION
         stage('Production Blue-Green') {
+            when {
+                expression { env.SKIP_DEPLOY != 'true' }
+            }
             steps {
                 milestone(3)
 
                 script {
-                    def active = sh(
-                        script: "docker ps --format '{{.Names}}' | grep blue || true",
-                        returnStdout: true
-                    ).trim() ? "blue" : "green"
-
-                    def idle = (active == "blue") ? "green" : "blue"
-                    def port = (idle == "green") ? "8084" : "8083"
-
-                    echo "Deploying to ${idle}"
-
-                    sh """
-                    docker rm -f ${idle} || true
-                    docker run -d -p ${port}:8080 --name ${idle} my-app:${BUILD_NUMBER}
-                    """
-
-                    sh """
-                    for i in 1 2 3
-                    do
-                      sleep 10
-                      curl -s http://127.0.0.1:${port} && exit 0
-                    done
-                    echo "Production not reachable, skipping..."
-                    exit 0
-                    """
-
-                    echo "Production switched to ${idle}"
+                    echo "Skipping Production Deployment (Demo Mode)"
                 }
             }
         }
