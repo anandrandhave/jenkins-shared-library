@@ -1,9 +1,11 @@
-FROM eclipse-temurin:17-jdk-jammy
+FROM node:18
 
 WORKDIR /app
 
-COPY target/*.jar app.jar
+COPY . .
+
+RUN npm install
 
 EXPOSE 8080
 
-ENTRYPOINT ["java","-jar","app.jar"]
+CMD ["node", "app.js"]
