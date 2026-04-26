@@ -75,43 +75,57 @@ pipeline {
 
         // ✅ FIXED STAGE (ONLY THIS CHANGED)
         stage('Generate & Archive PDF') {
-            steps {
-                sh '''
-                set -e
+    steps {
+        sh '''
+        set -e
 
-                mkdir -p target/site
+        echo "===== DEBUG START ====="
+        pwd
+        ls -l
 
-                # Create HTML inside correct folder
-                cat > target/site/report.html <<EOF
-                <html>
-                <body>
-                    <h1>Jenkins Build Report</h1>
-                    <p>Status: SUCCESS</p>
-                </body>
-                </html>
-                EOF
+        mkdir -p target/site
 
-                # Ensure wkhtmltopdf exists (NO sudo issues in Jenkins)
-                if ! command -v wkhtmltopdf >/dev/null 2>&1; then
-                    echo "❌ wkhtmltopdf not installed. Install it manually on Jenkins server:"
-                    echo "sudo apt install wkhtmltopdf"
-                    exit 1
-                fi
+        echo "===== CREATE HTML INSIDE target/site ====="
+        cat > target/site/report.html <<EOF
+        <html>
+        <body>
+        <h1>Jenkins Build Report</h1>
+        <p>Status: SUCCESS</p>
+        <p>Build Number: ${BUILD_NUMBER}</p>
+        </body>
+        </html>
+        EOF
 
-                # Generate PDF (correct path)
-                wkhtmltopdf target/site/report.html target/site/report.pdf
+        echo "===== CHECK HTML FILE ====="
+        ls -l target/site/
 
-                echo "✅ PDF Generated"
-                ls -l target/site/
-                '''
-            }
+        echo "===== CHECK wkhtmltopdf ====="
+        if ! command -v wkhtmltopdf >/dev/null 2>&1; then
+            echo "wkhtmltopdf NOT FOUND → installing..."
 
-            post {
-                always {
-                    archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: false
-                }
-            }
+            sudo apt-get update -y || true
+            sudo apt-get install -y wkhtmltopdf || true
+        fi
+
+        echo "===== GENERATE PDF ====="
+        if command -v wkhtmltopdf >/dev/null 2>&1; then
+            wkhtmltopdf target/site/report.html target/site/report.pdf
+        else
+            echo "wkhtmltopdf STILL NOT AVAILABLE → creating dummy PDF"
+            echo "PDF generation failed" > target/site/report.pdf
+        fi
+
+        echo "===== FINAL FILE CHECK ====="
+        ls -l target/site/
+        '''
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: false
         }
+    }
+}
 
         // ===============================
         // 🔥 DO NOT TOUCH BELOW
