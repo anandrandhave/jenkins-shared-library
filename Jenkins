@@ -108,6 +108,10 @@ pipeline {
             }
         }
 
+        // ===============================
+        // 🔥 QUICK HACK FIX APPLIED
+        // ===============================
+
         stage('Build Docker Image') {
             steps {
                 sh 'docker build -t my-app:${BUILD_NUMBER} .'
@@ -134,7 +138,7 @@ pipeline {
                             echo "Dev Health: ${res.status}"
                         }
                     } catch (e) {
-                        echo "⚠️ Dev app not reachable, skipping health check..."
+                        echo "⚠️ Dev App not reachable, skipping..."
                     }
                 }
             }
@@ -165,7 +169,7 @@ pipeline {
                             echo "Staging Health: ${res.status}"
                         }
                     } catch (e) {
-                        echo "⚠️ Staging app not reachable, skipping health check..."
+                        echo "⚠️ Staging App not reachable, skipping..."
                     }
                 }
             }
@@ -201,7 +205,7 @@ pipeline {
                             echo "Production Health: ${res.status}"
                         }
                     } catch (e) {
-                        echo "⚠️ Production app not reachable, skipping health check..."
+                        echo "⚠️ Production App not reachable, skipping..."
                     }
 
                     echo "Production switched to ${idle}"
