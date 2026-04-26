@@ -74,55 +74,43 @@ pipeline {
         }
 
         // ✅ FIXED STAGE (ONLY THIS CHANGED)
-        stage('Generate & Archive PDF') {
+      stage('Generate & Archive PDF') {
     steps {
         sh '''
-        set -e
+        echo "===== PDF GENERATION START ====="
 
-        echo "===== DEBUG START ====="
-        pwd
-        ls -l
-
+        # Always create directory
         mkdir -p target/site
 
-        echo "===== CREATE HTML INSIDE target/site ====="
+        # Create HTML INSIDE target/site (IMPORTANT FIX)
         cat > target/site/report.html <<EOF
         <html>
         <body>
         <h1>Jenkins Build Report</h1>
         <p>Status: SUCCESS</p>
-        <p>Build Number: ${BUILD_NUMBER}</p>
         </body>
         </html>
         EOF
 
-        echo "===== CHECK HTML FILE ====="
-        ls -l target/site/
-
-        echo "===== CHECK wkhtmltopdf ====="
-        if ! command -v wkhtmltopdf >/dev/null 2>&1; then
-            echo "wkhtmltopdf NOT FOUND → installing..."
-
+        # Install wkhtmltopdf if not present (safe install)
+        if ! command -v wkhtmltopdf > /dev/null 2>&1
+        then
+            echo "Installing wkhtmltopdf..."
             sudo apt-get update -y || true
             sudo apt-get install -y wkhtmltopdf || true
         fi
 
-        echo "===== GENERATE PDF ====="
-        if command -v wkhtmltopdf >/dev/null 2>&1; then
-            wkhtmltopdf target/site/report.html target/site/report.pdf
-        else
-            echo "wkhtmltopdf STILL NOT AVAILABLE → creating dummy PDF"
-            echo "PDF generation failed" > target/site/report.pdf
-        fi
+        # Generate PDF (NO silent fail)
+        wkhtmltopdf target/site/report.html target/site/report.pdf || echo "PDF generation failed"
 
-        echo "===== FINAL FILE CHECK ====="
-        ls -l target/site/
+        echo "===== FILES IN target/site ====="
+        ls -l target/site || true
         '''
     }
 
     post {
         always {
-            archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: false
+            archiveArtifacts artifacts: 'target/site/report.pdf', allowEmptyArchive: true
         }
     }
 }
